@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: fight-iq-ai
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: OPENAI_MODEL
+        value: gpt-6-astra
+      - key: OPENAI_API_KEY
+        sync: false
