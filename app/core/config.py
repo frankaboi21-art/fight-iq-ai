@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -9,6 +10,13 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:8000,http://localhost:3000"
     openai_api_key: str | None = None
     openai_model: str = "gpt-6-astra"
+    beta_access_code: str = ""
+    session_hours: int = Field(default=8, ge=1, le=24)
+    coach_hourly_limit: int = Field(default=10, ge=1, le=100)
+    coach_daily_limit: int = Field(default=30, ge=1, le=500)
+    usage_db_path: str = ".data/usage.sqlite3"
+    public_origin: str = ""
+    render_external_url: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -12,4 +12,4 @@ COPY app ./app
 COPY static ./static
 
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --ws-max-size 32768"]

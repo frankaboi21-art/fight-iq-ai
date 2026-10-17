@@ -97,21 +97,24 @@ def grade_for_score(score: float) -> str:
     return "F"
 
 
-def analyze_mistakes(mistakes: list[dict[str, Any]]) -> dict[str, Any]:
+def analyze_mistakes(mistakes: list[dict[str, Any]], reviewed_pillars: list[str] | None = None) -> dict[str, Any]:
     pillar_scores = {pillar: 100.0 for pillar in PILLAR_WEIGHTS}
+    reviewed = set(reviewed_pillars or []) & set(PILLAR_WEIGHTS)
     normalized: list[dict[str, Any]] = []
 
     for item in mistakes:
         mistake_id = str(item.get("mistake_id", "")).upper()
         severity = str(item.get("severity", "risky")).lower()
         round_no = int(item.get("round", 1))
+        count = int(item.get("count", 1))
         definition = MISTAKES.get(mistake_id)
         if not definition:
             continue
 
         severity = severity if severity in SEVERITY_PENALTY else "risky"
-        penalty = SEVERITY_PENALTY[severity] * (1 + (definition["danger_rating"] - 3) * 0.10)
+        penalty = SEVERITY_PENALTY[severity] * (1 + (definition["danger_rating"] - 3) * 0.10) * count
         pillar = definition["pillar"]
+        reviewed.add(pillar)
         pillar_scores[pillar] = max(0.0, pillar_scores[pillar] - penalty)
 
         normalized.append(
@@ -119,20 +122,28 @@ def analyze_mistakes(mistakes: list[dict[str, Any]]) -> dict[str, Any]:
                 "mistake_id": mistake_id,
                 "severity": severity,
                 "round": round_no,
+                "count": count,
                 **definition,
                 "penalty": round(penalty, 2),
             }
         )
 
-    overall = sum(pillar_scores[p] * w for p, w in PILLAR_WEIGHTS.items())
+    complete = len(reviewed) == len(PILLAR_WEIGHTS)
+    overall = round(sum(pillar_scores[p] * w for p, w in PILLAR_WEIGHTS.items()), 1) if complete else None
     priority = max(normalized, key=lambda x: (x["penalty"], x["danger_rating"]), default=None)
 
     return {
-        "overall_score": round(overall, 1),
-        "grade": grade_for_score(overall),
+        "overall_score": overall,
+        "grade": grade_for_score(overall) if overall is not None else None,
+        "assessment_status": "complete" if complete else ("partial" if reviewed else "not_assessed"),
+        "reviewed_count": len(reviewed),
+        "reviewed_pillars": sorted(reviewed),
+        "observation_count": sum(item["count"] for item in normalized),
+        "score_note": "A session estimate from manually logged observations, not a validated measure of fighting ability.",
         "pillar_scores": {
             pillar: {
-                "score": round(score, 1),
+                "score": round(score, 1) if pillar in reviewed else None,
+                "assessed": pillar in reviewed,
                 "weight": PILLAR_WEIGHTS[pillar],
             }
             for pillar, score in pillar_scores.items()
