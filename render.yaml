@@ -2,7 +2,7 @@ services:
   - type: web
     name: fight-iq-ai
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /api/v1/health
     envVars:
       - key: ENVIRONMENT
@@ -13,3 +13,9 @@ services:
         value: gpt-6-astra
       - key: OPENAI_API_KEY
         sync: false
+      - key: BETA_ACCESS_CODE
+        sync: false
+      - key: COACH_HOURLY_LIMIT
+        value: "10"
+      - key: COACH_DAILY_LIMIT
+        value: "30"
