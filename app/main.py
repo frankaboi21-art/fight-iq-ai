@@ -19,10 +19,11 @@ from app.core.config import get_settings
 from app.core.security import (COOKIE_NAME, access_ready, consume_allowance, make_session,
                                require_same_origin, require_session, session_id)
 from app.services.ai_coach import generate_corner_advice
+from app.services.video_coach import VideoRequest, generate_footage_review, validate_images
 from app.services.scoring_engine import MISTAKES, PILLAR_WEIGHTS, analyze_mistakes
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="0.2.0", docs_url=None, redoc_url=None)
+app = FastAPI(title=settings.app_name, version="0.3.0", docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list,
                    allow_credentials=True, allow_methods=["GET", "POST", "DELETE"],
                    allow_headers=["Content-Type", "X-FightIQ-Client"])
@@ -35,13 +36,23 @@ class BodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["method"] not in {"POST", "PUT", "PATCH"}:
             return await self.app(scope, receive, send)
+        video_request = scope["path"] == "/api/v1/video/review"
+        if video_request:
+            # Reject anonymous image uploads before buffering or decoding them.
+            try:
+                request = Request(scope)
+                require_same_origin(request)
+                require_session(request)
+            except HTTPException as error:
+                return await JSONResponse({"detail": error.detail}, error.status_code)(scope, receive, send)
+        limit = 6100000 if video_request else 32768
         messages, size = [], 0
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
                 return
             size += len(message.get("body", b""))
-            if size > 32768:
+            if size > limit:
                 return await JSONResponse({"detail": "Please shorten this request."}, 413)(scope, receive, send)
             messages.append(message)
             if not message.get("more_body", False):
@@ -62,8 +73,9 @@ async def response_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-        "connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        "media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
     )
+    response.headers["Permissions-Policy"] = "camera=(self), microphone=()"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -178,6 +190,37 @@ async def demo_analysis():
 
 
 coach_slots = asyncio.Semaphore(2)
+video_slots = asyncio.Semaphore(1)
+
+
+@app.post("/api/v1/video/review")
+async def video_review(payload: VideoRequest, request: Request):
+    require_same_origin(request)
+    identity = require_session(request)
+    if not settings.openai_api_key:
+        raise HTTPException(503, "Footage review is temporarily unavailable.")
+    if video_slots.locked():
+        raise HTTPException(429, "Another footage review is in progress. Please try shortly.",
+                            headers={"Retry-After": "30"})
+    async with video_slots:
+        try:
+            await asyncio.to_thread(validate_images, payload)
+        except ValueError:
+            raise HTTPException(422, "A video frame could not be read. Please select the section again.") from None
+        consume_allowance("video", identity)
+        try:
+            review = await asyncio.wait_for(generate_footage_review(payload), timeout=85)
+            return {"review": review, "model": settings.openai_model}
+        except (APITimeoutError, asyncio.TimeoutError):
+            raise HTTPException(504, "The footage review took too long. Try a shorter section.") from None
+        except APIConnectionError:
+            raise HTTPException(503, "The video coach couldn't connect. Please try again later.") from None
+        except APIStatusError as error:
+            if error.status_code == 429:
+                raise HTTPException(503, "The AI provider allowance is unavailable. Please try later.") from None
+            raise HTTPException(502, "The video coach is temporarily unavailable.") from None
+        except Exception:
+            raise HTTPException(502, "A grounded review couldn't be completed. Try a clearer section.") from None
 
 
 @app.post("/api/v1/ai/coach")
