@@ -91,11 +91,13 @@ def consume_allowance(kind: str, identity: str) -> dict:
     """
     now = time.time()
     cfg = get_settings()
-    limits = [(100, 900, None), (8, 900, identity)] if kind == "login" else [
-        (cfg.coach_daily_limit, 86400, None),
-        (cfg.coach_hourly_limit, 3600, None),
-        (3, 900, identity),
-    ]
+    if kind == "login":
+        limits = [(100, 900, None), (8, 900, identity)]
+    elif kind == "video":
+        limits = [(10, 86400, None), (3, 3600, None), (2, 900, identity)]
+    else:
+        limits = [(cfg.coach_daily_limit, 86400, None),
+                  (cfg.coach_hourly_limit, 3600, None), (3, 900, identity)]
     connection = None
     try:
         connection = _connection()

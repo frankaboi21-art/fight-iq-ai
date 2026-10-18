@@ -43,7 +43,7 @@ def login(client):
 def test_health_and_safe_headers(client):
     result = client.get('/api/v1/health')
     assert result.json()['status'] == 'ok'
-    assert result.json()['version'] == '0.2.0'
+    assert result.json()['version'] == '0.3.0'
     assert result.headers['cache-control'] == 'no-store'
     assert result.headers['x-content-type-options'] == 'nosniff'
     assert 'test-key-not-used' not in result.text
@@ -246,8 +246,181 @@ def test_existing_usage_ledger_is_respected_by_new_session(client):
 def test_html_loads_external_assets_and_has_no_inline_scripts(client):
     result = client.get('/')
     assert result.status_code == 200
-    assert '/static/app.js?v=2' in result.text
+    assert '/static/app.js?v=3' in result.text
     assert '<script>' not in result.text
     assert "script-src 'self'" in result.headers['content-security-policy']
     assert client.get('/static/styles.css').status_code == 200
     assert client.get('/static/app.js').status_code == 200
+
+# Footage-review checks use generated blank JPEGs and mocked AI; no real footage.
+import base64
+import io
+from types import SimpleNamespace
+from PIL import Image
+from app.services import video_coach
+
+
+def footage_payload(**overrides):
+    buffer = io.BytesIO()
+    Image.new('RGB', (64, 64), 'gray').save(buffer, 'JPEG')
+    image = 'data:image/jpeg;base64,' + base64.b64encode(buffer.getvalue()).decode()
+    payload = {'discipline': 'Boxing', 'experience': 'Beginner',
+               'athlete': 'Solo athlete in blue shorts', 'goal': 'Guard recovery',
+               'start': 10, 'end': 11, 'consent': True,
+               'frames': [{'timestamp': 10 + i / 5, 'image': image} for i in range(5)]}
+    return {**payload, **overrides}
+
+
+def footage_review(**overrides):
+    return video_coach.FootageReview(**{
+        'visibility': 'limited', 'athlete_match': 'confirmed',
+        'summary': 'A controlled stance is visible.', 'limitations': ['Only sampled frames were reviewed.'],
+        'moments': [{'frame_numbers': [2, 4], 'kind': 'strength', 'phase': 'movement',
+                     'title': 'Balanced stance', 'evidence': 'Base is visible in the cited frames.',
+                     'confidence': 'medium', 'why_it_matters': 'A base supports movement.',
+                     'adjustment': 'Practice slowly with a coach.'}],
+        'priority': 'Review stance with a coach.', 'additions': [], 'practice': [],
+        'next_session_check': 'Check whether the base remains stable.', **overrides})
+
+
+def test_video_anonymous_rejected_before_parsing_or_images(client, monkeypatch):
+    generate = AsyncMock()
+    monkeypatch.setattr(main, 'generate_footage_review', generate)
+    result = client.post('/api/v1/video/review', content='invalid', headers=HEADERS)
+    assert result.status_code == 401
+    generate.assert_not_called()
+
+
+def test_video_success_and_quota(client, monkeypatch):
+    login(client)
+    payload = footage_payload()
+    review = video_coach.attach_evidence(footage_review(), video_coach.VideoRequest(**payload))
+    generate = AsyncMock(return_value=review)
+    monkeypatch.setattr(main, 'generate_footage_review', generate)
+    for _ in range(2):
+        response = client.post('/api/v1/video/review', json=payload, headers=HEADERS)
+        assert response.status_code == 200
+        assert response.json()['review']['moments'][0]['timestamp'] == 10.2
+        assert response.json()['review']['coverage']['sample_fps'] == 5
+    assert client.post('/api/v1/video/review', json=payload, headers=HEADERS).status_code == 429
+    assert generate.call_count == 2
+
+
+@pytest.mark.parametrize('changes', [
+    {'consent': False}, {'athlete': ''}, {'discipline': 'unknown'},
+    {'experience': 'professional'}, {'end': 25}, {'start': -1},
+    {'start': float('inf')}, {'goal': 'x' * 601}, {'frames': []},
+])
+def test_video_rejects_bad_context_and_bounds(client, monkeypatch, changes):
+    login(client)
+    generate = AsyncMock()
+    monkeypatch.setattr(main, 'generate_footage_review', generate)
+    if changes.get('start') == float('inf'):
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            video_coach.VideoRequest(**footage_payload(**changes))
+    else:
+        assert client.post('/api/v1/video/review', json=footage_payload(**changes), headers=HEADERS).status_code == 422
+    generate.assert_not_called()
+
+
+def test_video_requires_ordered_timestamps_and_all_samples(client, monkeypatch):
+    login(client)
+    generate = AsyncMock()
+    monkeypatch.setattr(main, 'generate_footage_review', generate)
+    payload = footage_payload()
+    payload['frames'][1]['timestamp'] = 10.9
+    assert client.post('/api/v1/video/review', json=payload, headers=HEADERS).status_code == 422
+    payload = footage_payload(end=20)  # Ten seconds requires fifty frames.
+    assert client.post('/api/v1/video/review', json=payload, headers=HEADERS).status_code == 422
+    generate.assert_not_called()
+
+
+@pytest.mark.parametrize('image', ['https://example.com/private.jpg', 'data:image/jpeg;base64,' + 'a' * 60])
+def test_video_rejects_remote_or_corrupt_frames(client, monkeypatch, image):
+    login(client)
+    generate = AsyncMock()
+    monkeypatch.setattr(main, 'generate_footage_review', generate)
+    payload = footage_payload()
+    payload['frames'][0]['image'] = image
+    assert client.post('/api/v1/video/review', json=payload, headers=HEADERS).status_code == 422
+    generate.assert_not_called()
+
+
+def test_video_rejects_oversized_images_before_decode(client):
+    payload = footage_payload()
+    data = io.BytesIO()
+    Image.new('RGB', (1000, 64)).save(data, 'JPEG')
+    payload['frames'][0]['image'] = 'data:image/jpeg;base64,' + base64.b64encode(data.getvalue()).decode()
+    with pytest.raises(ValueError):
+        video_coach.validate_images(video_coach.VideoRequest(**payload))
+
+
+def test_video_body_limit_and_cross_origin(client):
+    login(client)
+    assert client.post('/api/v1/video/review', content='x' * 6100001, headers=HEADERS).status_code == 413
+    assert client.post('/api/v1/video/review', json=footage_payload(), headers={**HEADERS, 'Origin': 'https://other.example'}).status_code == 403
+    assert client.post('/api/v1/session', content='x' * 33000, headers=HEADERS).status_code == 413
+
+
+def test_video_citations_resolve_only_to_supplied_frames():
+    payload = video_coach.VideoRequest(**footage_payload())
+    result = video_coach.attach_evidence(footage_review(), payload)
+    assert result['moments'][0]['timestamp'] == 10.2
+    assert result['moments'][0]['end_timestamp'] == 10.6
+    bad = footage_review()
+    bad.moments[0].frame_numbers = [99]
+    with pytest.raises(RuntimeError):
+        video_coach.attach_evidence(bad, payload)
+
+
+@pytest.mark.parametrize('changes', [{'visibility':'unusable'}, {'athlete_match':'uncertain'}])
+def test_uncertain_video_removes_personalized_findings(changes):
+    result = video_coach.attach_evidence(footage_review(**changes), video_coach.VideoRequest(**footage_payload()))
+    assert result['moments'] == result['additions'] == result['practice'] == []
+
+
+def test_video_provider_failure_is_safe_and_consumes_allowance(client, monkeypatch):
+    login(client)
+    generate = AsyncMock(side_effect=RuntimeError('internal data must not be returned'))
+    monkeypatch.setattr(main, 'generate_footage_review', generate)
+    for _ in range(2):
+        response = client.post('/api/v1/video/review', json=footage_payload(), headers=HEADERS)
+        assert response.status_code == 502
+        assert 'internal data' not in response.text
+    assert client.post('/api/v1/video/review', json=footage_payload(), headers=HEADERS).status_code == 429
+
+
+def test_video_global_allowance_survives_new_sessions(client):
+    for i in range(3):
+        security.consume_allowance('video', f'session-{i}')
+    with pytest.raises(HTTPException) as caught:
+        security.consume_allowance('video', 'new-session')
+    assert caught.value.status_code == 429
+
+
+def test_video_provider_receives_images_context_and_no_storage(client, monkeypatch):
+    import asyncio
+    provider = AsyncMock()
+    provider.responses.parse.return_value = SimpleNamespace(output_parsed=footage_review())
+    factory = AsyncMock()
+    factory.__aenter__.return_value = provider
+    monkeypatch.setattr(video_coach, 'AsyncOpenAI', lambda **kwargs: factory)
+    result = asyncio.run(video_coach.generate_footage_review(video_coach.VideoRequest(**footage_payload())))
+    args = provider.responses.parse.call_args.kwargs
+    assert args['store'] is False
+    assert args['text_format'] is video_coach.FootageReview
+    parts = args['input'][0]['content']
+    assert len([part for part in parts if part['type'] == 'input_image']) == 5
+    assert '10.200' in parts[3]['text']
+    assert result['coverage']['frames'] == 5
+
+
+def test_footage_assets_and_video_policy(client):
+    response = client.get('/')
+    assert 'id="fightVideo"' in response.text
+    assert 'id="videoConsent"' in response.text
+    assert '/static/video.js?v=3' in response.text
+    assert "media-src 'self' blob:" in response.headers['content-security-policy']
+    assert 'microphone=()' in response.headers['permissions-policy']
+    assert client.get('/static/video.js').status_code == 200
