@@ -51,3 +51,7 @@ AI reviews sample five frames per second over a selected section of up to ten se
 The release passed 52 automated tests, deployment checks, and a synthetic blank-image abstention check. Browser media/camera workflows and coaching accuracy on real athlete footage remain unverified. Automated application tests are not evidence of coaching effectiveness.
 
 See [the development roadmap](ROADMAP.md) for the sequence and completion criteria, and [the README](README.md) for current operation and limitations.
+
+## Development update — October 19, 2026
+
+The 0.4 release implements individual athlete accounts, persistent text reviews, profile preferences, evidence-linked practice and reassessment, coverage dashboards, athlete-authored tactical systems, private scouting/style notes and revocable coach comments. It is prepared for deployment pending approval and configuration of a paid persistent database. Its practice organizer is rules-based; its tactical systems are athlete-authored. Neither should be described as a clinically or competitively validated coaching system. See [release status and boundaries](RELEASE_0_4.md).

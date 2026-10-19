@@ -2,6 +2,8 @@
 
 This roadmap turns the [product vision](PRODUCT_VISION.md) into an implementation sequence. These are planned milestones, not delivered features or promised dates. Work should complete and validate the core training loop before expanding into scouting or real-time coaching.
 
+**October 19, 2026 implementation status:** release 0.4 implements the account/journal foundation, a rules-based practice organizer and linked reassessment, an athlete-authored tactical builder, and coach review/comments. Deployment awaits paid database approval. These implementations do not complete the quality-validation milestones below. Continuous vision, automated scouting and professionally reviewed tactical content remain unimplemented. See [release details](RELEASE_0_4.md).
+
 ## 1. Establish trustworthy footage coaching
 
 **Athlete outcome:** reliably review a training exchange and leave with a specific, defensible practice task.

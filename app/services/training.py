@@ -234,7 +234,9 @@ def register(payload: Credentials, request: Request, response: Response):
         if db.execute("SELECT id FROM athletes WHERE handle=?", (payload.handle,)).fetchone():
             raise HTTPException(409, "That username is unavailable. Choose another.")
         owner = secrets.token_hex(16)
-        db.execute("INSERT INTO athletes VALUES (?,?,?,?,?,?)", (owner, payload.handle, encoded, digest(recovery), Profile().model_dump_json(), time.time()))
+        inserted = db.execute("INSERT INTO athletes VALUES (?,?,?,?,?,?) ON CONFLICT(handle) DO NOTHING", (owner, payload.handle, encoded, digest(recovery), Profile().model_dump_json(), time.time()))
+        if inserted.rowcount != 1:
+            raise HTTPException(409, "That username is unavailable. Choose another.")
         login_cookie(response, db, owner)
     return {"recovery_code": recovery, "message": "Save this recovery code in your password manager. It is shown only once."}
 

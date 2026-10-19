@@ -107,6 +107,8 @@ Tests mock OpenAI; they never spend API credits. Before a release, browser verif
 
 Training tests run against SQLite locally and additionally against PostgreSQL 18 in CI. To test a disposable local PostgreSQL database, set `TRAINING_TEST_POSTGRES_URL` to that test database before running pytest. **The training fixture deletes all athletes and usage attempts in that test database. Never point it at production.**
 
+CI also runs `tests/training_ui.cjs` with Node 26 and `jsdom@30.1.3`. This checks DOM logic for safe profile rendering, explicit context application, saving signed snapshots, tactical branches and stale-footage protection. It uses mocked HTTP and no browser/camera or layout rendering. For a local run, install that test dependency under `.test-deps` and set `NODE_PATH` to `.test-deps/node_modules` before invoking the test.
+
 ## API
 
 - `GET /api/v1/health`: service and configuration status; no secrets.
