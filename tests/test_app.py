@@ -43,7 +43,7 @@ def login(client):
 def test_health_and_safe_headers(client):
     result = client.get('/api/v1/health')
     assert result.json()['status'] == 'ok'
-    assert result.json()['version'] == '0.3.0'
+    assert result.json()['version'] == '0.4.0'
     assert result.headers['cache-control'] == 'no-store'
     assert result.headers['x-content-type-options'] == 'nosniff'
     assert 'test-key-not-used' not in result.text
@@ -246,7 +246,7 @@ def test_existing_usage_ledger_is_respected_by_new_session(client):
 def test_html_loads_external_assets_and_has_no_inline_scripts(client):
     result = client.get('/')
     assert result.status_code == 200
-    assert '/static/app.js?v=3' in result.text
+    assert '/static/app.js?v=4' in result.text
     assert '<script>' not in result.text
     assert "script-src 'self'" in result.headers['content-security-policy']
     assert client.get('/static/styles.css').status_code == 200
@@ -420,7 +420,7 @@ def test_footage_assets_and_video_policy(client):
     response = client.get('/')
     assert 'id="fightVideo"' in response.text
     assert 'id="videoConsent"' in response.text
-    assert '/static/video.js?v=3' in response.text
+    assert '/static/video.js?v=4' in response.text
     assert "media-src 'self' blob:" in response.headers['content-security-policy']
     assert 'microphone=()' in response.headers['permissions-policy']
     assert client.get('/static/video.js').status_code == 200

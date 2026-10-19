@@ -31,6 +31,7 @@
   }
   document.addEventListener('fightiq:access',controls);
   function discardReview() {
+    document.dispatchEvent(new Event('fightiq:footage-clear'));
     lab.review=null;lab.frames=[];lab.context=null;
     message('');
     $('videoResults').replaceChildren();$('videoResults').hidden=true;
@@ -214,6 +215,7 @@
       message(`Reviewing ${lab.frames.length} sampled frames. This may take up to 90 seconds.`);
       const response=await api('/api/v1/video/review',{method:'POST',timeoutMs:95000,body:JSON.stringify({...details,start:selection.start,end:selection.end,consent:$('videoConsent').checked,frames:lab.frames})});
       lab.review=response.review;lab.context=details;renderReview();
+      document.dispatchEvent(new CustomEvent('fightiq:footage',{detail:{report:response.review,receipt:response.receipt,discipline:details.discipline}}));
       message(lab.review.visibility==='unusable'||lab.review.athlete_match==='uncertain'?'The footage could not support a confident athlete review. See the limitations below.':'Your footage review is ready. Check the cited moments before applying the advice.');
     }catch(error){if(error.status===401){state.authenticated=false;message('Your beta access expired. Unlock AI Corner, then try again.',true);}else message(error.message,true);}
     finally {lab.busy=false;state.busy=false;$('videoProgress').hidden=true;updateControls();}

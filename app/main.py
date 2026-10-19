@@ -21,9 +21,11 @@ from app.core.security import (COOKIE_NAME, access_ready, consume_allowance, mak
 from app.services.ai_coach import generate_corner_advice
 from app.services.video_coach import VideoRequest, generate_footage_review, validate_images
 from app.services.scoring_engine import MISTAKES, PILLAR_WEIGHTS, analyze_mistakes
+from app.services.training import router as training_router, receipt
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="0.3.0", docs_url=None, redoc_url=None)
+app = FastAPI(title=settings.app_name, version="0.4.0", docs_url=None, redoc_url=None)
+app.include_router(training_router)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list,
                    allow_credentials=True, allow_methods=["GET", "POST", "DELETE"],
                    allow_headers=["Content-Type", "X-FightIQ-Client"])
@@ -174,7 +176,8 @@ async def mistakes():
 
 @app.post("/api/v1/analysis")
 async def analysis(payload: AnalysisRequest):
-    return calculate(payload)
+    report = calculate(payload)
+    return {**report, "receipt": receipt("session", report)}
 
 
 DEMO_MISTAKES = [
@@ -210,7 +213,7 @@ async def video_review(payload: VideoRequest, request: Request):
         consume_allowance("video", identity)
         try:
             review = await asyncio.wait_for(generate_footage_review(payload), timeout=85)
-            return {"review": review, "model": settings.openai_model}
+            return {"review": review, "model": settings.openai_model, "receipt": receipt("footage", review)}
         except (APITimeoutError, asyncio.TimeoutError):
             raise HTTPException(504, "The footage review took too long. Try a shorter section.") from None
         except APIConnectionError:
@@ -238,7 +241,8 @@ async def ai_coach(payload: CoachRequest, request: Request):
         consume_allowance("coach", identity)
         try:
             plan = await asyncio.wait_for(generate_corner_advice(report, payload.context), timeout=55)
-            return {"plan": plan, "model": settings.openai_model}
+            return {"plan": plan, "model": settings.openai_model,
+                    "receipt": receipt("corner", {"plan": plan, "assessment": report})}
         except (APITimeoutError, asyncio.TimeoutError):
             raise HTTPException(504, "Your coaching request took too long. You can try again.") from None
         except APIConnectionError:

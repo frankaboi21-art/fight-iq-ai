@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     usage_db_path: str = ".data/usage.sqlite3"
     public_origin: str = ""
     render_external_url: str = ""
+    database_url: str = ""
+    training_db_path: str = ".data/training.sqlite3"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

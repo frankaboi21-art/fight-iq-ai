@@ -16,7 +16,7 @@ async function api(path, options={}) {
 }
 const assessmentPayload = () => ({mistakes:state.logs.map(({mistake_id,severity,round,count})=>({mistake_id,severity,round,count})),reviewed_pillars:state.reviewed});
 function feedback(message, error=false){$('coachFeedback').hidden=!message;$('coachFeedback').textContent=message;$('coachFeedback').classList.toggle('error',error);}
-function clearPlan(){state.plan=null;$('coachingPlan').hidden=true;$('coachingPlan').replaceChildren();$('planToolbar').hidden=true;$('planPlaceholder').hidden=false;$('copyStatus').textContent='';feedback('');}
+function clearPlan(){state.plan=null;state.planReceipt=null;$('coachingPlan').hidden=true;$('coachingPlan').replaceChildren();$('planToolbar').hidden=true;$('planPlaceholder').hidden=false;$('copyStatus').textContent='';feedback('');}
 function updateControls(){
   document.dispatchEvent(new Event('fightiq:access'));
   $('coachButton').disabled=state.busy||state.loading||!state.assessment?.reviewed_count;
@@ -74,7 +74,7 @@ async function requestCoaching(){
   if(state.busy||state.loading)return;if(!state.authenticated){openAccess();return;}if(!state.assessment?.reviewed_count){feedback('Review your session first.',true);return;}
   if(!state.coachAvailable){feedback('AI Corner is temporarily unavailable. Your assessment is still available.',true);return;}
   state.busy=true;clearPlan();updateControls();feedback('Your corner is reviewing the session. This can take up to a minute.');
-  try{const context=[`Discipline: ${$('discipline').value}`,`Experience: ${$('experience').value||'not specified'}`,$('context').value.trim()].join('\n');const data=await api('/api/v1/ai/coach',{method:'POST',body:JSON.stringify({...assessmentPayload(),context})});state.plan=data.plan;renderPlan(data.plan);feedback('Your plan is ready. Review it with your coach before trying the drills.');}
+  try{const context=[`Discipline: ${$('discipline').value}`,`Experience: ${$('experience').value||'not specified'}`,$('context').value.trim()].join('\n');const data=await api('/api/v1/ai/coach',{method:'POST',body:JSON.stringify({...assessmentPayload(),context})});state.plan=data.plan;state.planReceipt=data.receipt;renderPlan(data.plan);feedback('Your plan is ready. Review it with your coach before trying the drills.');}
   catch(error){if(error.status===401){state.authenticated=false;feedback('Your access expired. Unlock AI Corner and try again.',true);}else feedback(error.message,true);}
   finally{state.busy=false;updateControls();}
 }

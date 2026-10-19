@@ -55,6 +55,17 @@ def require_session(request: Request) -> str:
     identity = session_id(request)
     if not identity:
         raise HTTPException(401, "Unlock AI Corner with your beta access code.")
+    # Logged-in athletes keep the same AI allowance across beta unlocks/devices.
+    if request.cookies.get("fightiq_athlete"):
+        from app.core import database
+        from app.services.training import account
+        if database.available():
+            with database.transaction() as db:
+                try:
+                    return account(request, db)["id"]
+                except HTTPException as error:
+                    if error.status_code != 401:
+                        raise
     return identity
 
 
@@ -98,6 +109,24 @@ def consume_allowance(kind: str, identity: str) -> dict:
     else:
         limits = [(cfg.coach_daily_limit, 86400, None),
                   (cfg.coach_hourly_limit, 3600, None), (3, 900, identity)]
+    if cfg.database_url:
+        from app.core.database import transaction
+        with transaction() as db:
+            # Shared lock across instances makes reservations atomic and durable.
+            db.execute("SELECT pg_advisory_xact_lock(481093)")
+            db.execute("DELETE FROM attempts WHERE created < ?", (now - 86400,))
+            for limit, seconds, owner in limits:
+                query = "SELECT COUNT(*), MIN(created) FROM attempts WHERE kind=? AND created>?"
+                args = [kind, now - seconds]
+                if owner is not None:
+                    query += " AND identity=?"
+                    args.append(owner)
+                count, oldest = db.execute(query, args).fetchone()
+                if count >= limit:
+                    raise HTTPException(429, "Request allowance reached. Please try again later.",
+                                        headers={"Retry-After": str(max(1, int(oldest + seconds - now) + 1))})
+            db.execute("INSERT INTO attempts VALUES (?,?,?)", (kind, identity, now))
+        return {"session_limit": 3, "window_minutes": 15}
     connection = None
     try:
         connection = _connection()
