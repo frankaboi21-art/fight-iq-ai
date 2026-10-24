@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Literal
 
@@ -21,9 +22,28 @@ from app.core.security import (COOKIE_NAME, access_ready, consume_allowance, mak
 from app.services.ai_coach import generate_corner_advice
 from app.services.video_coach import VideoRequest, generate_footage_review, validate_images
 from app.services.scoring_engine import MISTAKES, PILLAR_WEIGHTS, analyze_mistakes
+from app.services.training import router as training_router, receipt
+from app.services.round_review import router as round_router, cleanup_loop
+from app.services.research import router as research_router
 
 settings = get_settings()
-app = FastAPI(title=settings.app_name, version="0.3.0", docs_url=None, redoc_url=None)
+
+
+@asynccontextmanager
+async def lifespan(app):
+    cleanup = asyncio.create_task(cleanup_loop())
+    try:
+        yield
+    finally:
+        cleanup.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup
+
+
+app = FastAPI(title=settings.app_name, version="0.4.0", docs_url=None, redoc_url=None, lifespan=lifespan)
+app.include_router(training_router)
+app.include_router(round_router)
+app.include_router(research_router)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list,
                    allow_credentials=True, allow_methods=["GET", "POST", "DELETE"],
                    allow_headers=["Content-Type", "X-FightIQ-Client"])
@@ -36,7 +56,7 @@ class BodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["method"] not in {"POST", "PUT", "PATCH"}:
             return await self.app(scope, receive, send)
-        video_request = scope["path"] == "/api/v1/video/review"
+        video_request = scope["path"] == "/api/v1/video/review" or (scope["path"].startswith("/api/v1/rounds/") and "/sections/" in scope["path"])
         if video_request:
             # Reject anonymous image uploads before buffering or decoding them.
             try:
@@ -174,7 +194,8 @@ async def mistakes():
 
 @app.post("/api/v1/analysis")
 async def analysis(payload: AnalysisRequest):
-    return calculate(payload)
+    report = calculate(payload)
+    return {**report, "receipt": receipt("session", report)}
 
 
 DEMO_MISTAKES = [
@@ -210,7 +231,7 @@ async def video_review(payload: VideoRequest, request: Request):
         consume_allowance("video", identity)
         try:
             review = await asyncio.wait_for(generate_footage_review(payload), timeout=85)
-            return {"review": review, "model": settings.openai_model}
+            return {"review": review, "model": settings.openai_model, "receipt": receipt("footage", review)}
         except (APITimeoutError, asyncio.TimeoutError):
             raise HTTPException(504, "The footage review took too long. Try a shorter section.") from None
         except APIConnectionError:
@@ -238,7 +259,8 @@ async def ai_coach(payload: CoachRequest, request: Request):
         consume_allowance("coach", identity)
         try:
             plan = await asyncio.wait_for(generate_corner_advice(report, payload.context), timeout=55)
-            return {"plan": plan, "model": settings.openai_model}
+            return {"plan": plan, "model": settings.openai_model,
+                    "receipt": receipt("corner", {"plan": plan, "assessment": report})}
         except (APITimeoutError, asyncio.TimeoutError):
             raise HTTPException(504, "Your coaching request took too long. You can try again.") from None
         except APIConnectionError:

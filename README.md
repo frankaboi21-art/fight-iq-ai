@@ -1,11 +1,22 @@
 # Fight IQ AI
 
+**Train with intelligence. Fight with purpose. Evolve with every session.**
+
+Our goal is to make high-quality combat sports intelligence, education, and performance analysis more accessible, personalized, and measurable. The [product vision](PRODUCT_VISION.md) defines that destination; the [development roadmap](ROADMAP.md) sets the implementation sequence and validation criteria. The capabilities below describe the current beta.
+
 An invite-only martial-arts coaching beta with a footage lab and manual session review. Record or choose video locally, inspect short exchanges, and request evidence-linked coaching for MMA, boxing, Muay Thai, kickboxing, BJJ or wrestling.
 
 ## What works
 
+- Private athlete accounts with password sign-in, one-time recovery codes, profile preferences and explicit text-review saving.
+- A persistent journal for training reviews, opponent notes and style studies; scouting does not feed the athlete's personal practice plan.
+- A rules-based practice organizer from confirmed reviews, with completion notes and reassessment linked to later confirmed evidence in the same discipline and setting.
+- Progress coverage, self-reported outcomes, athlete-authored tactical decision trees, and revocable coach access to self-training reviews and comments.
+- Account export and deletion. Original videos and extracted frames are never stored in the training database.
 - Camera recording (video only) and local video import, with playback, slow motion and FPS-based stepping.
 - Five sampled frames per second for a selected 1–10-second section; up to 50 frames per review. Longer videos can be reviewed section by section.
+- Consecutive-section reviews covering up to five minutes, with background section processing, progress, pause/resume, cancellation, explicit retries and a bounded evidence index. Temporary text results expire after seven days; images are never persisted.
+- AI scouting and style studies from up to six chosen, confirmed footage reviews, with server-resolved citations and invalidation when source evidence changes. These drafts require coach review.
 - Athlete selection by clothing/position, discipline and experience context, cited evidence frames, strengths/corrections, skills to explore, and practice blocks with success checks.
 - A server-validated evidence timeline: timestamps come from supplied frames, not invented model times. Unusable footage or uncertain athlete matching suppresses personalized findings.
 
@@ -41,6 +52,9 @@ AI coaching is disabled until `BETA_ACCESS_CODE` contains a random secret at lea
 | `ENVIRONMENT` | `production` enables Secure cookies; local default is `development` |
 | `PUBLIC_ORIGIN` | Optional canonical origin such as `https://fight-iq-ai.onrender.com` |
 | `RENDER_EXTERNAL_URL` | Render's automatic canonical URL; used if `PUBLIC_ORIGIN` is unset |
+| `DATABASE_URL` | Persistent PostgreSQL connection string; required for saved accounts in production |
+| `TRAINING_DB_PATH` | `.data/training.sqlite3`, development/test fallback only |
+| `ROUND_HOURLY_LIMIT` / `ROUND_DAILY_LIMIT` | Shared longer-round section attempts: 30/hour and 60/day by default; separate from short-clip limits |
 | `CORS_ORIGINS` | Leave empty for the same-origin deployed frontend |
 | `SESSION_HOURS` | 8, configurable from 1 to 24 |
 | `COACH_HOURLY_LIMIT` | 10 attempted provider requests across the service |
@@ -65,7 +79,23 @@ The `Dockerfile` and `render.yaml` describe a single free web service. Keep the 
 
 `render.yaml` does not update a manually configured service automatically. Changes to secrets on an existing service must be applied in the dashboard. Free instances sleep when idle and may take time to wake.
 
-The current request ledger is SQLite on the service filesystem. It survives process restarts while that filesystem remains, but Render's free disk is ephemeral: deploys or instance replacement can reset it. Run one instance and one worker for this beta. It is not a durable financial cap. Monitor provider usage and budget alerts; move counters to shared persistent storage before scaling or promising durable per-account quotas.
+With `DATABASE_URL`, accounts, profiles, saved text reviews, practice outcomes, tactical systems, coach grants/comments and request allowances use PostgreSQL. Allowance reservations are serialized with a database advisory lock; signed-in athletes retain the same allowance identity across beta unlocks. Without it, only the previous beta features run in production: saved-account endpoints refuse to use ephemeral disk. The original SQLite usage ledger remains a fallback and can reset when Render replaces its filesystem. These request counts are not a financial cap. Continue running one worker for the current AI concurrency limits.
+
+## Athlete development
+
+Create an account after unlocking beta access, using a unique username and a password of 15–128 characters. Save the recovery code in a password manager: there is no email reset. Passwords use scrypt; recovery codes and session tokens are stored as hashes. Account sessions last seven days. Resetting a password rotates the recovery code and revokes existing account sessions. Beta access remains separately required for AI requests.
+
+Saving a review is a separate action with a purpose, training setting, date and duration. AI reports and manual assessments carry integrity receipts; altering the generated report invalidates saving it as that report. Corrections are recorded separately, preserving the source. Save a written note for observations outside an AI review. Only confirmed self-training reviews in the athlete's primary discipline supply practice tasks; uncertain footage never supplies tasks. The organizer prioritizes recent outstanding drills, groups duplicate names and fits them to the chosen time budget. It does not make a fresh AI diagnosis or claim validated progress.
+
+Reassessment requires a later, confirmed self-training record in the same discipline and setting. Outcomes are explicitly self-reported. Removing or unconfirming linked evidence resets its associated reassessment result. Coverage tables distinguish sampled video seconds, manually reviewed pillars and logged session minutes; the app does not aggregate those into a fighter ranking.
+
+Tactical systems are athlete-authored, versioned by saving a new copy, and can reference a journal entry. The explorer presents a situation, cue, action, possible reactions, follow-ups and defensive exits. They are training hypotheses, not a coach-validated library or guaranteed predictions. Taekwondo is supported for profiles, written records and tactical systems; automated Taekwondo footage review remains pending validation.
+
+Coach access is granted to an exact existing username. It includes all present and future self-training entries and their text notes; it excludes the private profile, scouting and style research. Coaches can comment but cannot confirm, edit or delete an athlete's records. Revocation prevents future reads/comments; it cannot erase copies a recipient already made. Granting access sends no message and does not verify coaching credentials.
+
+Account exports contain profile, saved entries, practice results, tactical systems and comments. Deleting an account removes its active records, sessions, grants and authored comments through database cascades. Managed database backups follow provider retention and are not erased immediately by an account deletion. Use the app's export before deletion when a personal archive is needed.
+
+PostgreSQL schema creation is idempotent and protected by a schema advisory lock. Production never falls back to the development SQLite training file. Set the database URL through Render's secret environment settings, not in source control. See [release setup](RELEASE_0_4.md) for the prepared deployment and pending approval.
 
 ## Verification
 
@@ -73,9 +103,14 @@ The current request ledger is SQLite on the service filesystem. It survives proc
 python -m pytest -q
 node --check static/app.js
 node --check static/video.js
+node --check static/training.js
 ```
 
 Tests mock OpenAI; they never spend API credits. Before a release, browser verification should cover empty/partial/complete assessments, repeat observations, sample data, access, coaching output, mobile layout, and errors. A live AI test should be a deliberate separate check.
+
+Training tests run against SQLite locally and additionally against PostgreSQL 18 in CI. To test a disposable local PostgreSQL database, set `TRAINING_TEST_POSTGRES_URL` to that test database before running pytest. **The training fixture deletes all athletes and usage attempts in that test database. Never point it at production.**
+
+CI also runs `tests/training_ui.cjs` with Node 26 and `jsdom@30.1.3`. This checks DOM logic for safe profile rendering, explicit context application, saving signed snapshots, tactical branches and stale-footage protection. It uses mocked HTTP and no browser/camera or layout rendering. For a local run, install that test dependency under `.test-deps` and set `NODE_PATH` to `.test-deps/node_modules` before invoking the test.
 
 ## API
 
@@ -86,6 +121,9 @@ Tests mock OpenAI; they never spend API credits. Before a release, browser verif
 - `GET/POST/DELETE /api/v1/session`: inspect, unlock, or lock beta access.
 - `POST /api/v1/video/review`: authenticated, consented frame sequence and athlete context; returns an evidence-linked `review`.
 - `POST /api/v1/ai/coach`: authenticated session review, recomputed server-side. Returns a structured `plan`.
+- `/api/v1/training`: account registration/login/recovery/logout, profile, journal entries, feedback, practice outcomes, development summary, tactical systems, coach grants/comments, export and account deletion. These use a separate athlete session cookie and never accept video/image uploads.
+- `/api/v1/rounds`: create/list/read/delete private temporary round jobs, submit the next section, and cancel. Athlete account plus beta access is required to submit provider work. Completed text survives reloads; reselect the identical source file to resume. One section is processed globally at a time using a database lease, with up to three explicit extra attempts per round. Failed provider calls count toward allowances. Expired jobs are purged on service startup, hourly while active, and during job listing/creation; a sleeping service purges when it next runs. Provider calls already started can still consume usage after cancellation.
+- `/api/v1/research`: generate/list/delete private cited studies from confirmed research footage entries. Uses the written-coaching allowance. Chosen review text, references and corrections are sent with explicit consent; no third-party URLs are fetched. Deleting source entries deletes their derived studies; correcting/unconfirming sources hides stale advice.
 - `WS /ws/live/{session_id}`: bounded, validated observation updates.
 
 Session mutations and coaching require `X-FightIQ-Client: web`; browser origins must match the canonical app origin. Invalid, expired, or absent sessions cannot call OpenAI.
@@ -94,4 +132,6 @@ Session mutations and coaching require `X-FightIQ-Client: web`; browser origins 
 
 Scores are provisional estimates based on manual observations. The weights and grade thresholds have not been clinically or competitively validated. They do not measure overall fighting ability. Footage reviews inspect sampled still frames from the selected section, not continuous video or audio. The app does not diagnose injuries or replace a qualified coach.
 
-This release uses one shared beta invitation code, not individual user accounts. Sessions and coaching plans are not saved to a user database. Refreshing or closing the tab loses the current review; download notes to keep the generated plan. The usage ledger retains only hashes, event types, and timestamps for 24 hours, not training notes. AI requests send the selected observations or explicitly consented footage frames and context to OpenAI with response storage disabled.
+AI requests still use a shared beta invitation code. Individual athlete accounts persist explicitly saved text records and consented temporary round results. Unsaved short-section reviews are lost when the tab closes or refreshes. The usage ledger retains only hashes, event types and timestamps for 24 hours. Saved athlete records and studies persist until deleted. AI requests send selected observations, research evidence, or consented footage frames and context to OpenAI with response storage disabled. Applying a saved profile/practice focus copies details into visible form fields; it does not send the journal to AI automatically.
+
+For isolated browser verification, run `python -m uvicorn tests.preview_app:app --host 127.0.0.1 --port 8007`. This explicit test entry point uses deterministic synthetic provider results, a separate `.data/browser-preview` database and the non-secret test invitation `synthetic-browser-test-code`. Never deploy this entry point. Synthetic interface checks and real athlete coaching evaluation are separate; see [VALIDATION.md](VALIDATION.md) for the remaining full-vision launch gates.
