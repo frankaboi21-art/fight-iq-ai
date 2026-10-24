@@ -65,8 +65,8 @@
     root.replaceChildren();
     const bar=node('div',undefined,'hub-account-bar');bar.append(node('strong',hub.athlete.profile.display_name||hub.athlete.handle),node('span',`${hub.athlete.profile.discipline} · ${hub.athlete.profile.experience}`,'field-hint'),button('Sign out',async()=>{await post('/logout',{});await refresh();}));root.append(bar);
     const nav=node('nav',undefined,'hub-nav');nav.setAttribute('aria-label','Training hub');
-    ['Progress','Journal','Tactics','Coaches','Profile'].forEach(page=>{const b=button(page,()=>{hub.page=page;render();});b.setAttribute('aria-pressed',String(hub.page===page));nav.append(b);});root.append(nav);
-    ({Progress:renderProgress,Journal:renderJournal,Tactics:renderTactics,Coaches:renderCoaches,Profile:renderProfile})[hub.page]();
+    ['Progress','Journal','Tactics','Research','Coaches','Profile'].forEach(page=>{const b=button(page,()=>{hub.page=page;render();});b.setAttribute('aria-pressed',String(hub.page===page));nav.append(b);});root.append(nav);
+    ({Progress:renderProgress,Journal:renderJournal,Tactics:renderTactics,Research:renderResearch,Coaches:renderCoaches,Profile:renderProfile})[hub.page]();
   }
   function renderProfile(){
     const panel=section('The athlete behind the footage.','Your profile stays private. Use “Apply to my next review” to place selected details in the visible coaching fields before sending them to AI.');
@@ -101,7 +101,7 @@
     const panel=section('Your next purposeful practice.',plan.goal||'Set a development goal in your profile, then save and confirm a review.');
     panel.append(node('p',`${plan.discipline} · ${plan.sessions_per_week} sessions per week · up to ${plan.practice_minutes} minutes of focused practice per session`,'eyebrow'));
     if(!plan.tasks.length)panel.append(node('p','No confirmed, unfinished drills yet. Save a footage or corner review, check the advice, and confirm it in your journal.'),link('Review footage →','#footage'));
-    plan.tasks.forEach(task=>{const card=node('article',undefined,'hub-practice');card.append(node('h4',task.name),node('p',`${task.allocated_minutes} minutes · ${task.status}`,'field-hint'),node('p',task.instructions),node('strong','Check for: '+task.success_check),node('p',`From “${task.source_title}” · ${task.performed_on}`,'field-hint'),button('Record practice / reassess',()=>showEntry(hub.entries.find(e=>e.id===task.entry_id))));panel.append(card);});
+    plan.tasks.forEach(task=>{const card=node('article',undefined,'hub-practice');card.append(node('h4',task.name),node('p',`${task.allocated_minutes} minutes · ${task.revisit?'Revisit after reassessment':task.status}`,'field-hint'),node('p',task.instructions),node('strong','Check for: '+task.success_check));if(task.next_step)card.append(node('p',task.next_step));if(task.revisit&&task.notes)card.append(node('p','Your reassessment notes: '+task.notes));card.append(node('p',`From “${task.source_title}” · ${task.performed_on}`,'field-hint'),button('Record practice / reassess',()=>showEntry(hub.entries.find(e=>e.id===task.entry_id))));panel.append(card);});
     panel.append(node('p',plan.reason,'field-hint'),button('Apply profile & priorities to my next review',applyProfile));root.append(panel);
     const coverage=section('Progress needs comparable evidence.',`${plan.metrics.reported_improving} reassessed tasks are marked improving by you. These are self-reported outcomes, not a validated ability score.`);
     if(!plan.coverage.length)coverage.append(node('p','Your session coverage will appear here after you save a review.'));
@@ -164,7 +164,7 @@
     const comments=node('div');discussion.append(comments);const form=node('form',undefined,'hub-form');field(form,'Add a comment','body',{lines:2,maxLength:2000,required:true});
     submit(form,'Save comment',async data=>{await post(`/entries/${entry.id}/comments`,data);form.reset();await loadComments();});discussion.append(form);dialog.append(discussion);
     async function loadComments(){const data=await read(`/entries/${entry.id}/comments`);comments.replaceChildren();data.comments.forEach(c=>{const el=node('article',undefined,'hub-comment');el.append(node('strong',c.author),node('p',c.body));comments.append(el);});}
-    if(!shared)dialog.append(button('Delete this review',async()=>{if(!window.confirm('Delete this saved review and its comments? Linked reassessment outcomes will be reset.'))return;await remove('/entries/'+entry.id);dialog.close();await refresh();}));
+    if(!shared)dialog.append(button('Delete this review',async()=>{if(!window.confirm('Delete this saved review, its comments and research studies based on it? Linked reassessment outcomes will be reset.'))return;await remove('/entries/'+entry.id);dialog.close();await refresh();}));
     const close=node('button','Close review','button quiet');close.type='button';close.addEventListener('click',()=>dialog.close());dialog.append(close);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
     try{await loadComments();}catch(error){comments.textContent=error.message;}
   }
@@ -176,6 +176,32 @@
     const athletes=section('Athletes sharing with you.','Open a shared review to add feedback. Your account is not a verification of coaching credentials.');
     if(!hub.team.athletes.length)athletes.append(node('p','No athletes have granted you access yet. Give them your username: '+hub.athlete.handle));
     hub.team.athletes.forEach(a=>athletes.append(button('Review '+a.handle,async()=>{const data=await read(`/athletes/${a.id}/entries`);const list=section(a.handle+' — shared training');if(!data.entries.length)list.append(node('p','No self-training reviews saved yet.'));data.entries.forEach(e=>list.append(button(`${e.performed_on} · ${e.title}`,()=>showEntry(e,true))));athletes.querySelector('.shared-reviews')?.remove();list.classList.add('shared-reviews');athletes.append(list);})));root.append(athletes);
+  }
+  function renderResearch(){
+    const panel=section('Study the evidence. Prepare with purpose.','Compare up to six confirmed footage reviews from one discipline. Choose opponent scouting or style study when saving those reviews, and include a footage reference. These private studies are AI drafts; they do not prove a fighter’s tendencies or predict outcomes.');
+    const form=node('form',undefined,'hub-form');textField(form,'Study title','title','',100).required=true;
+    const purpose=field(form,'Research purpose','purpose',{choices:[{label:'Opponent scouting',value:'opponent'},{label:'Style study',value:'style'}]});
+    field(form,'What do you want to understand?','question',{lines:3,minLength:3,maxLength:600,required:true});
+    const choices=node('fieldset',undefined,'bare-fieldset');choices.append(node('legend','Choose confirmed footage reviews'));const list=node('div');choices.append(list);form.append(choices);
+    const draw=()=>{list.replaceChildren();const eligible=hub.entries.filter(e=>e.kind==='footage'&&e.purpose===purpose.value&&e.feedback.verdict==='confirmed'&&e.source.trim()&&e.report.athlete_match==='confirmed'&&e.report.visibility!=='unusable'&&e.report.moments.length);
+      if(!eligible.length)list.append(node('p','No eligible reviews yet. Save footage with this purpose and a source reference, then check its evidence and confirm it in your journal.'));
+      eligible.forEach(e=>{const label=node('label',undefined,'consent-check'),check=node('input');check.type='checkbox';check.name='source_entry';check.value=e.id;label.append(check,node('span',`${e.title} · ${e.discipline} · ${e.source}`));list.append(label);});};purpose.addEventListener('change',draw);draw();
+    const consentLabel=node('label',undefined,'consent-check'),consent=node('input');consent.type='checkbox';consent.required=true;consentLabel.append(consent,node('span','I have permission to use these sources. Send the selected review text, source references, corrections and my question to OpenAI, then save the resulting study privately to my account.'));form.append(consentLabel);
+    submit(form,'Generate cited study',async data=>{
+      if(state.busy)throw new Error('Wait for the current AI request to finish.');
+      if(!state.authenticated){openAccess();message('Unlock beta access, then submit this study again.');return;}
+      const entry_ids=[...list.querySelectorAll('input:checked')].map(x=>x.value);if(!entry_ids.length||entry_ids.length>6)throw new Error('Choose between one and six source reviews.');
+      state.busy=true;updateControls();message('Comparing your chosen evidence. This may take up to 80 seconds.');
+      try{await api('/api/v1/research',{method:'POST',timeoutMs:85000,body:JSON.stringify({title:data.title,purpose:data.purpose,question:data.question,entry_ids,consent:consent.checked})});await loadStudies();message('Study saved as an AI draft. Check every citation with your coach.');}finally{state.busy=false;updateControls();}
+    });panel.append(form,node('p','Uses the shared written-coaching allowance. There are no automatic retries. Source references are labels; this feature does not download third-party videos.','field-hint'));root.append(panel);
+    const library=section('Your research library.','If a source review is corrected or unconfirmed, its studies are marked stale. Deleting a source also deletes studies derived from it.');const results=node('div');library.append(results,button('Refresh studies',loadStudies));root.append(library);
+    async function loadStudies(){const data=await api('/api/v1/research');results.replaceChildren();if(!data.studies.length)results.append(node('p','No studies saved yet.'));
+      data.studies.forEach(study=>{const card=node('article',undefined,'hub-practice');card.append(node('h4',study.title),node('p',`${study.discipline} · ${study.purpose} · ${study.status}`,'field-hint'));
+        if(study.report){const r=study.report;card.append(node('p',r.summary));r.limitations.forEach(x=>card.append(node('p',x,'field-hint')));
+          r.findings.forEach(f=>{const detail=node('details');detail.append(node('summary',f.title),node('p','Observed: '+f.observation),node('p','Possible interpretation: '+f.interpretation),node('p','Uncertainty: '+f.uncertainty),node('p','Practice option: '+f.training_option),node('p','Prerequisite: '+f.prerequisite),node('p','Success check: '+f.success_check));f.citations.forEach(c=>{const evidence=node('blockquote');evidence.append(node('p',`${c.title} · ${c.timestamp.toFixed(1)}–${c.end_timestamp.toFixed(1)}s · ${c.source}`),node('p',c.evidence));const entry=hub.entries.find(e=>e.id===c.entry_id);if(entry)evidence.append(button('Open cited review',()=>showEntry(entry)));detail.append(evidence);});card.append(detail);});card.append(node('p','Evidence to collect next: '+r.next_evidence),button('Download study',()=>download(study,'fight-iq-study.json')));
+        }card.append(button('Delete study',async()=>{if(!window.confirm('Delete this private research study? Source reviews will remain.'))return;await api('/api/v1/research/'+study.id,{method:'DELETE'});await loadStudies();}));results.append(card);});
+    }
+    loadStudies().catch(e=>{results.textContent=e.message;});
   }
   function renderTactics(){
     const panel=section('Build a system, not a collection of moves.','Describe a situation, choose an action, and map two possible responses with a defensive exit. These are athlete-authored training hypotheses; review them with your coach.');

@@ -2,13 +2,13 @@
 
 This roadmap turns the [product vision](PRODUCT_VISION.md) into an implementation sequence. These are planned milestones, not delivered features or promised dates. Work should complete and validate the core training loop before expanding into scouting or real-time coaching.
 
-**October 19, 2026 implementation status:** release 0.4 implements the account/journal foundation, a rules-based practice organizer and linked reassessment, an athlete-authored tactical builder, and coach review/comments. Deployment awaits paid database approval. These implementations do not complete the quality-validation milestones below. Continuous vision, automated scouting and professionally reviewed tactical content remain unimplemented. See [release details](RELEASE_0_4.md).
+**October 24, 2026 implementation status:** working source implements accounts/journals, a rules-based practice organizer and linked reassessment, athlete-authored tactics, coach review/comments, resumable consecutive-section round reviews, and cited AI scouting/style studies from selected saved evidence. Purchase and deployment remain on hold until the full long-term scope is implemented, polished and validated. Continuous vision, gym administration, richer adaptive planning and professionally reviewed tactical content remain unfinished. Local synthetic browser checks have started; they do not establish coaching accuracy. See [readiness evidence](VALIDATION.md).
 
 ## 1. Establish trustworthy footage coaching
 
 **Athlete outcome:** reliably review a training exchange and leave with a specific, defensible practice task.
 
-- Verify import, recording, playback, section selection, frame extraction, consent, retries initiated by the athlete, and result export on supported mobile and desktop browsers. Browser testing remains pending under the existing user preference; obtain explicit permission before resuming it.
+- Verify import, recording, playback, section selection, frame extraction, consent, retries initiated by the athlete, and result export on supported mobile and desktop browsers. Local browser testing with synthetic footage and test accounts was explicitly authorized on October 20; personal footage and camera use remain outside that test permission.
 - Assemble a permissioned evaluation set across MMA/striking, boxing, and BJJ/wrestling, with coach-labelled moments, athlete identity by clothing/position, obscured views, and clips where no useful claim can be made.
 - Evaluate timestamp grounding, athlete matching, unsupported claims, missed events, appropriate abstention, discipline accuracy, and usefulness of suggested drills. Report results per discipline and footage quality, including reviewer disagreement.
 - Require evidence, uncertainty, a correction, and a measurable practice check for each actionable finding. Separate possible explanations from observed facts.

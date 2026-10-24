@@ -8,9 +8,9 @@
 <title>Fight IQ AI — Train with intelligence</title>
 <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
 <link rel="stylesheet" href="/static/styles.css?v=4">
-<script src="/static/app.js?v=4" defer></script>
-<script src="/static/video.js?v=4" defer></script>
-<script src="/static/training.js?v=4" defer></script>
+<script src="/static/app.js?v=4&amp;rev=1" defer></script>
+<script src="/static/video.js?v=4&amp;rev=3" defer></script>
+<script src="/static/training.js?v=4&amp;rev=4" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#review">Skip to session review</a>
@@ -55,6 +55,15 @@
 <button class="button primary" type="submit" id="reviewVideo" disabled>Review this section ↗</button><p class="field-hint">Beta access required · 2 reviews per 15 minutes · Shared service limits: 3/hour, 10/day.</p>
 </fieldset></form><div class="video-method"><strong>Evidence before advice.</strong><p>Timestamped moments, strengths and corrections, skills to explore, and a practical training plan. Unclear footage will be marked as uncertain.</p></div>
 </div></div>
+<section class="panel hub-panel" aria-labelledby="roundTitle">
+<p class="eyebrow">LONGER ROUND REVIEW · EXPERIMENTAL</p><h3 id="roundTitle">Follow the whole round.</h3>
+<p>Review up to five minutes in consecutive sections at 5 sampled frames per second. Each section is analyzed separately; athlete identity is not tracked across sections. A five-minute round uses up to 30 AI requests and may take several minutes.</p>
+<p class="field-hint">Sign in to an athlete account. Text results and the file name stay privately in your account for seven days so you can resume; original video and images are never stored. Save the completed index to your journal if you want to keep it. Closing this tab pauses new sections. An already submitted section can finish in the background.</p>
+<label for="roundLength">Round length from selected start (seconds)</label><input id="roundLength" type="number" min="1" max="300" value="180" step="1">
+<label class="consent-check"><input id="roundConsent" type="checkbox"><span>Process these sections with AI and keep temporary text results in my account for seven days.</span></label>
+<div class="plan-toolbar"><button class="button secondary" id="prepareRound" type="button">Prepare round review</button><button class="button quiet" id="loadRounds" type="button">My recent round reviews</button><button class="button quiet" id="pauseRound" type="button" hidden>Pause after this section</button><button class="button quiet" id="cancelRound" type="button" hidden>Cancel round review</button></div>
+<p id="roundStatus" role="status" aria-live="polite"></p><progress id="roundProgress" max="30" value="0" aria-label="Round sections completed" hidden></progress><div id="roundJobs"></div><div id="roundResults"></div>
+</section>
 <div id="videoStatus" class="feedback" role="status" aria-live="polite" hidden></div>
 <progress id="videoProgress" max="50" value="0" aria-label="Frames prepared" hidden></progress>
 <div id="frameStrip" class="frame-strip" aria-label="Frames included in the last review" hidden></div>

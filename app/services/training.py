@@ -25,17 +25,23 @@ class Strict(BaseModel):
 
 
 class Credentials(Strict):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False, allow_inf_nan=False)
     handle: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_]+$")
     password: str = Field(min_length=15, max_length=128)
 
-    @field_validator("handle")
+    @field_validator("handle", mode="before")
     @classmethod
     def lowercase(cls, value):
-        return value.lower()
+        return value.strip().lower() if isinstance(value, str) else value
 
 
 class Recovery(Credentials):
     recovery: str = Field(min_length=20, max_length=100)
+
+    @field_validator("recovery", mode="before")
+    @classmethod
+    def clean_code(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class Profile(Strict):
@@ -91,6 +97,7 @@ class CoachGrant(Strict):
 
 
 class DeleteAccount(Strict):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False, allow_inf_nan=False)
     password: str = Field(min_length=1, max_length=128)
     confirmation: Literal["DELETE"]
 
@@ -412,6 +419,10 @@ def delete_entry(entry_id: str, request: Request):
         db.lock_owner(owner)
         owned_entry(db, owner, entry_id)
         db.execute("DELETE FROM training_entries WHERE id=? AND athlete=?", (entry_id, owner))
+        for row in db.execute("SELECT data FROM research_reports WHERE athlete=?", (owner,)).fetchall():
+            study = json.loads(row[0])
+            if entry_id in study["sources"]:
+                db.execute("DELETE FROM research_reports WHERE id=? AND athlete=?", (study["id"], owner))
         for entry in load_entries(db, owner):
             changed = False
             for task in entry["tasks"]:
@@ -429,15 +440,26 @@ def delete_entry(entry_id: str, request: Request):
 
 
 def development(profile, entries):
-    own = [e for e in entries if e["purpose"] == "self" and e["discipline"] == profile["discipline"]]
+    own = sorted([e for e in entries if e["purpose"] == "self" and e["discipline"] == profile["discipline"]],
+                 key=lambda e: (e["performed_on"], e["created"]), reverse=True)
     confirmed = [e for e in own if e["feedback"]["verdict"] == "confirmed"]
     tasks, seen = [], set()
     for entry in confirmed:
         for task in entry["tasks"]:
-            key = task["name"].casefold()
-            if task["status"] != "reassessed" and key not in seen and len(tasks) < 3:
-                seen.add(key)
-                tasks.append({**task, "entry_id": entry["id"], "source_title": entry["title"], "performed_on": entry["performed_on"]})
+            key = " ".join(task["name"].casefold().split())
+            if key in seen:
+                continue
+            # The latest confirmed version governs a drill, including completion.
+            # Do not resurrect an older duplicate after a successful reassessment.
+            seen.add(key)
+            if task["status"] == "reassessed" and task["outcome"] == "improving":
+                continue
+            if len(tasks) < 3:
+                revisit = task["status"] == "reassessed"
+                tasks.append({**task, "entry_id": entry["id"], "source_title": entry["title"],
+                              "performed_on": entry["performed_on"], "revisit": revisit,
+                              "next_step": "Review the drill and your reassessment notes with your coach, then adjust and practice again." if revisit else
+                              "Practice the agreed correction, then compare it with a later review."})
     minutes = profile["practice_minutes"]
     used, selected = 0, []
     for task in tasks:
@@ -449,7 +471,7 @@ def development(profile, entries):
     all_tasks = [t for e in confirmed for t in e["tasks"]]
     return {"goal": profile["goal"], "discipline": profile["discipline"], "tasks": selected,
             "sessions_per_week": profile["sessions_per_week"], "practice_minutes": minutes,
-            "reason": "Outstanding drills from your most recent confirmed reviews in this discipline. Duplicate drill names are grouped. This is a rules-based practice organizer, not a new AI assessment.",
+            "reason": "The latest confirmed session for each drill guides this plan. Unchanged or difficult reassessments stay in focus; improving drills leave the active plan. This is a rules-based practice organizer, not a new AI assessment.",
             "metrics": {"saved_reviews": len(own), "confirmed_reviews": len(confirmed),
                         "practiced_tasks": sum(t["status"] != "planned" for t in all_tasks),
                         "reassessed_tasks": sum(t["status"] == "reassessed" for t in all_tasks),
@@ -468,12 +490,15 @@ def plan(request: Request):
 
 @router.get("/export")
 def export(request: Request):
+    from app.services.research import records as research_records
     with database.transaction() as db:
         athlete = account(request, db)
         comments = db.execute("SELECT c.entry,a.handle,c.body,c.created FROM coach_comments c JOIN training_entries e ON c.entry=e.id JOIN athletes a ON c.author=a.id WHERE e.athlete=?", (athlete["id"],)).fetchall()
         return {"format": "fightiq-training-v1", "exported": time.time(), "athlete": athlete,
                 "entries": load_entries(db, athlete["id"]),
                 "systems": [json.loads(r[0]) for r in db.execute("SELECT data FROM tactical_systems WHERE athlete=?", (athlete["id"],)).fetchall()],
+                "temporary_round_reviews": [{k: v for k, v in json.loads(r[0]).items() if k != "lease"} for r in db.execute("SELECT data FROM round_jobs WHERE athlete=? AND created>?", (athlete["id"], time.time()-7*86400)).fetchall()],
+                "research_studies": research_records(db, athlete["id"]),
                 "comments": [{"entry": c[0], "author": c[1], "body": c[2], "created": c[3]} for c in comments]}
 
 

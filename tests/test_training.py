@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -96,6 +96,18 @@ def test_beta_required_register_and_csrf(client):
     assert client.post('/api/v1/training/profile', json={'sessions_per_week': 0}, headers=HEADERS).status_code == 422
 
 
+def test_password_spaces_are_preserved_for_login_and_deletion(client):
+    assert client.post('/api/v1/session', json={'code': CODE}, headers=HEADERS).status_code == 200
+    exact = '  significant password spaces  '
+    response = client.post('/api/v1/training/register', json={'handle': ' Spaced_User ', 'password': exact}, headers=HEADERS)
+    assert response.status_code == 200
+    client.post('/api/v1/training/logout', json={}, headers=HEADERS)
+    assert client.post('/api/v1/training/login', json={'handle': 'spaced_user', 'password': exact.strip()}, headers=HEADERS).status_code == 401
+    assert client.post('/api/v1/training/login', json={'handle': 'spaced_user', 'password': exact}, headers=HEADERS).status_code == 200
+    assert client.post('/api/v1/training/delete-account', json={'password': exact.strip(), 'confirmation': 'DELETE'}, headers=HEADERS).status_code == 401
+    assert client.post('/api/v1/training/delete-account', json={'password': exact, 'confirmation': 'DELETE'}, headers=HEADERS).status_code == 200
+
+
 def test_private_records_not_visible_to_other_accounts(client):
     register(client)
     first = save(client, note())
@@ -158,6 +170,37 @@ def test_different_settings_cannot_claim_comparable_progress(client):
     confirm(client, later)
     result = client.post(f'/api/v1/training/entries/{entry["id"]}/tasks/0', json={'status': 'reassessed', 'outcome': 'improving', 'reassessment_entry': later['id']}, headers=HEADERS)
     assert result.status_code == 422
+
+
+def test_reassessment_revisits_difficult_drills_without_resurrecting_old_duplicates(client):
+    register(client)
+    older = save(client, reviewed_payload(title='Original drill'))
+    confirm(client, older)
+    latest = save(client, reviewed_payload(title='Updated drill'))
+    confirm(client, latest)
+    later = save(client, note('Later evidence'))
+    confirm(client, later)
+    url = f'/api/v1/training/entries/{latest["id"]}/tasks/0'
+    payload = {'status': 'reassessed', 'outcome': 'improving', 'reassessment_entry': later['id']}
+    assert client.post(url, json=payload, headers=HEADERS).status_code == 200
+    assert client.get('/api/v1/training/development').json()['tasks'] == []
+    for outcome in ['unchanged', 'needs_work']:
+        payload.update(outcome=outcome, notes='Review the setup with my coach.')
+        assert client.post(url, json=payload, headers=HEADERS).status_code == 200
+        tasks = client.get('/api/v1/training/development').json()['tasks']
+        assert len(tasks) == 1 and tasks[0]['entry_id'] == latest['id']
+        assert tasks[0]['revisit'] is True and tasks[0]['notes'] == payload['notes']
+
+
+def test_backfilled_session_does_not_override_more_recent_training(client):
+    register(client)
+    recent = save(client, reviewed_payload(title='Today'))
+    confirm(client, recent)
+    historical = save(client, reviewed_payload(title='Backfilled yesterday', performed_on=(date.today()-timedelta(days=1)).isoformat()))
+    confirm(client, historical)
+    plan = client.get('/api/v1/training/development').json()
+    assert plan['tasks'][0]['entry_id'] == recent['id']
+    assert plan['coverage'][0]['title'] == 'Today'
 
 
 def test_scouting_and_uncertain_footage_do_not_feed_athlete_plan(client):

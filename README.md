@@ -15,6 +15,8 @@ An invite-only martial-arts coaching beta with a footage lab and manual session 
 - Account export and deletion. Original videos and extracted frames are never stored in the training database.
 - Camera recording (video only) and local video import, with playback, slow motion and FPS-based stepping.
 - Five sampled frames per second for a selected 1–10-second section; up to 50 frames per review. Longer videos can be reviewed section by section.
+- Consecutive-section reviews covering up to five minutes, with background section processing, progress, pause/resume, cancellation, explicit retries and a bounded evidence index. Temporary text results expire after seven days; images are never persisted.
+- AI scouting and style studies from up to six chosen, confirmed footage reviews, with server-resolved citations and invalidation when source evidence changes. These drafts require coach review.
 - Athlete selection by clothing/position, discipline and experience context, cited evidence frames, strengths/corrections, skills to explore, and practice blocks with success checks.
 - A server-validated evidence timeline: timestamps come from supplied frames, not invented model times. Unusable footage or uncertain athlete matching suppresses personalized findings.
 
@@ -52,6 +54,7 @@ AI coaching is disabled until `BETA_ACCESS_CODE` contains a random secret at lea
 | `RENDER_EXTERNAL_URL` | Render's automatic canonical URL; used if `PUBLIC_ORIGIN` is unset |
 | `DATABASE_URL` | Persistent PostgreSQL connection string; required for saved accounts in production |
 | `TRAINING_DB_PATH` | `.data/training.sqlite3`, development/test fallback only |
+| `ROUND_HOURLY_LIMIT` / `ROUND_DAILY_LIMIT` | Shared longer-round section attempts: 30/hour and 60/day by default; separate from short-clip limits |
 | `CORS_ORIGINS` | Leave empty for the same-origin deployed frontend |
 | `SESSION_HOURS` | 8, configurable from 1 to 24 |
 | `COACH_HOURLY_LIMIT` | 10 attempted provider requests across the service |
@@ -119,6 +122,8 @@ CI also runs `tests/training_ui.cjs` with Node 26 and `jsdom@30.1.3`. This check
 - `POST /api/v1/video/review`: authenticated, consented frame sequence and athlete context; returns an evidence-linked `review`.
 - `POST /api/v1/ai/coach`: authenticated session review, recomputed server-side. Returns a structured `plan`.
 - `/api/v1/training`: account registration/login/recovery/logout, profile, journal entries, feedback, practice outcomes, development summary, tactical systems, coach grants/comments, export and account deletion. These use a separate athlete session cookie and never accept video/image uploads.
+- `/api/v1/rounds`: create/list/read/delete private temporary round jobs, submit the next section, and cancel. Athlete account plus beta access is required to submit provider work. Completed text survives reloads; reselect the identical source file to resume. One section is processed globally at a time using a database lease, with up to three explicit extra attempts per round. Failed provider calls count toward allowances. Expired jobs are purged on service startup, hourly while active, and during job listing/creation; a sleeping service purges when it next runs. Provider calls already started can still consume usage after cancellation.
+- `/api/v1/research`: generate/list/delete private cited studies from confirmed research footage entries. Uses the written-coaching allowance. Chosen review text, references and corrections are sent with explicit consent; no third-party URLs are fetched. Deleting source entries deletes their derived studies; correcting/unconfirming sources hides stale advice.
 - `WS /ws/live/{session_id}`: bounded, validated observation updates.
 
 Session mutations and coaching require `X-FightIQ-Client: web`; browser origins must match the canonical app origin. Invalid, expired, or absent sessions cannot call OpenAI.
@@ -127,4 +132,6 @@ Session mutations and coaching require `X-FightIQ-Client: web`; browser origins 
 
 Scores are provisional estimates based on manual observations. The weights and grade thresholds have not been clinically or competitively validated. They do not measure overall fighting ability. Footage reviews inspect sampled still frames from the selected section, not continuous video or audio. The app does not diagnose injuries or replace a qualified coach.
 
-AI requests still use a shared beta invitation code. Individual athlete accounts persist only explicitly saved text records; unsaved reviews are lost when the tab closes or refreshes. The usage ledger retains only hashes, event types and timestamps for 24 hours. Saved athlete records persist until deleted. AI requests send selected observations or consented footage frames and context to OpenAI with response storage disabled. Applying a saved profile/practice focus copies details into visible form fields; it does not send the journal to AI automatically.
+AI requests still use a shared beta invitation code. Individual athlete accounts persist explicitly saved text records and consented temporary round results. Unsaved short-section reviews are lost when the tab closes or refreshes. The usage ledger retains only hashes, event types and timestamps for 24 hours. Saved athlete records and studies persist until deleted. AI requests send selected observations, research evidence, or consented footage frames and context to OpenAI with response storage disabled. Applying a saved profile/practice focus copies details into visible form fields; it does not send the journal to AI automatically.
+
+For isolated browser verification, run `python -m uvicorn tests.preview_app:app --host 127.0.0.1 --port 8007`. This explicit test entry point uses deterministic synthetic provider results, a separate `.data/browser-preview` database and the non-secret test invitation `synthetic-browser-test-code`. Never deploy this entry point. Synthetic interface checks and real athlete coaching evaluation are separate; see [VALIDATION.md](VALIDATION.md) for the remaining full-vision launch gates.

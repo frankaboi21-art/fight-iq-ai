@@ -19,6 +19,9 @@ SCHEMA = (
     "CREATE TABLE IF NOT EXISTS attempts (kind TEXT, identity TEXT, created DOUBLE PRECISION)",
     "CREATE INDEX IF NOT EXISTS attempts_lookup ON attempts(kind, created)",
     "CREATE TABLE IF NOT EXISTS tactical_systems (id TEXT PRIMARY KEY, athlete TEXT NOT NULL REFERENCES athletes(id) ON DELETE CASCADE, data TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS round_jobs (id TEXT PRIMARY KEY, athlete TEXT NOT NULL REFERENCES athletes(id) ON DELETE CASCADE, data TEXT NOT NULL, created DOUBLE PRECISION NOT NULL, updated DOUBLE PRECISION NOT NULL, status TEXT NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS round_owner ON round_jobs(athlete, created)",
+    "CREATE TABLE IF NOT EXISTS research_reports (id TEXT PRIMARY KEY, athlete TEXT NOT NULL REFERENCES athletes(id) ON DELETE CASCADE, data TEXT NOT NULL, created DOUBLE PRECISION NOT NULL)",
 )
 
 

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     render_external_url: str = ""
     database_url: str = ""
     training_db_path: str = ".data/training.sqlite3"
+    round_hourly_limit: int = Field(default=30, ge=1, le=120)
+    round_daily_limit: int = Field(default=60, ge=1, le=300)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
