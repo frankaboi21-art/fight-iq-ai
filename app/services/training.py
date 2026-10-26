@@ -86,6 +86,7 @@ class TaskUpdate(Strict):
     outcome: Literal["not_checked", "improving", "unchanged", "needs_work"] = "not_checked"
     notes: str = Field(default="", max_length=1000)
     reassessment_entry: str = Field(default="", max_length=40)
+    planned_minutes: int | None = Field(default=None, ge=1, le=60)
 
 
 class Comment(Strict):
@@ -445,38 +446,15 @@ def delete_entry(entry_id: str, request: Request):
 
 
 def development(profile, entries):
+    from app.services.development import organize
     own = sorted([e for e in entries if e["purpose"] == "self" and e["discipline"] == profile["discipline"]],
                  key=lambda e: (e["performed_on"], e["created"]), reverse=True)
     confirmed = [e for e in own if e["feedback"]["verdict"] == "confirmed"]
-    tasks, seen = [], set()
-    for entry in confirmed:
-        for task in entry["tasks"]:
-            key = " ".join(task["name"].casefold().split())
-            if key in seen:
-                continue
-            # The latest confirmed version governs a drill, including completion.
-            # Do not resurrect an older duplicate after a successful reassessment.
-            seen.add(key)
-            if task["status"] == "reassessed" and task["outcome"] == "improving":
-                continue
-            if len(tasks) < 3:
-                revisit = task["status"] == "reassessed"
-                tasks.append({**task, "entry_id": entry["id"], "source_title": entry["title"],
-                              "performed_on": entry["performed_on"], "revisit": revisit,
-                              "next_step": "Review the drill and your reassessment notes with your coach, then adjust and practice again." if revisit else
-                              "Practice the agreed correction, then compare it with a later review."})
     minutes = profile["practice_minutes"]
-    used, selected = 0, []
-    for task in tasks:
-        allocation = min(task["minutes"] or 5, minutes-used)
-        if allocation <= 0:
-            break
-        selected.append({**task, "allocated_minutes": allocation})
-        used += allocation
     all_tasks = [t for e in confirmed for t in e["tasks"]]
-    return {"goal": profile["goal"], "discipline": profile["discipline"], "tasks": selected,
+    return {"goal": profile["goal"], "discipline": profile["discipline"], **organize(profile, confirmed),
             "sessions_per_week": profile["sessions_per_week"], "practice_minutes": minutes,
-            "reason": "The latest confirmed session for each drill guides this plan. Unchanged or difficult reassessments stay in focus; improving drills leave the active plan. This is a rules-based practice organizer, not a new AI assessment.",
+            "reason": "The latest confirmed session for each drill governs the plan. Needs-work and unchanged reassessments come first, then practiced drills awaiting a check, then new practice. Improving drills leave the active plan. Within each group, newer sessions come first. Up to three full drills fit your time budget. This is a rules-based organizer of existing advice, not a new AI assessment or a severity ranking.",
             "metrics": {"saved_reviews": len(own), "confirmed_reviews": len(confirmed),
                         "practiced_tasks": sum(t["status"] != "planned" for t in all_tasks),
                         "reassessed_tasks": sum(t["status"] == "reassessed" for t in all_tasks),

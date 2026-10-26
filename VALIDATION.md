@@ -1,13 +1,13 @@
 # Fight IQ AI readiness record
 
-Updated October 24, 2026. Paid hosting and deployment are on hold at the owner's request while implementation, polish and functional verification continue. A green code test suite alone does not mean the product vision is fully implemented or the coaching is validated.
+Updated October 25, 2026. Paid hosting and deployment are on hold at the owner's request while implementation, polish and functional verification continue. A green code test suite alone does not mean the product vision is fully implemented or the coaching is validated.
 
 ## Working source versus remaining scope
 
 | Product area | Implemented foundation | Required before claiming the full capability |
 | --- | --- | --- |
 | Footage coaching | Record/import controls, short-section reviews, consecutive round processing up to five minutes, progress/pause/resume/cancel, temporary text results and evidence index | Wider device/codec tests, permissioned real footage, coach-reviewed accuracy and cost/latency evaluation; continuous motion/identity tracking remains unimplemented |
-| Athlete development | Private profiles, saved text reviews, confirmed-review practice organizer, reassessment, coverage dashboard | Complete end-to-end user testing; richer adaptive plans and measured longitudinal usefulness |
+| Athlete development | Private profiles, saved text reviews, outcome-prioritized weekly practice outlines, explicit timing, source-linked reassessment, coverage dashboard | Broader end-to-end user testing; AI-generated longitudinal coaching and measured usefulness |
 | Tactical education | Athlete-authored decision systems, linked journal evidence and branch explorer | Professionally reviewed content, discipline-specific evaluation and more complete systems |
 | Scouting/style study | Private notes plus AI comparison of up to six explicitly selected, confirmed footage reviews; server-checked citations, source references, permissions attestation and source-change invalidation | Real-provider and coach-reviewed usefulness evaluation; these are studies of supplied evidence, not autonomous web scouting or athlete identification |
 | Coach collaboration | Revocable direct access/comments, gym owner/coach/athlete roles, accepted invitations, athlete-controlled journal sharing, coach-authored shared plans and access/activity audit | Broader multi-user/mobile evaluation, organizational reporting and integrations; coach qualifications remain unverified |
@@ -24,6 +24,9 @@ Updated October 24, 2026. Paid hosting and deployment are on hold at the owner's
 - Fixed garbled UI symbols, password whitespace handling and reassessment priority selection. Browser checks use synthetic fixtures and cannot establish AI coaching quality.
 - Round/research checkpoint `4cdaa94` passed 118 CI checks across SQLite and PostgreSQL 18, plus JavaScript syntax and DOM checks.
 - Gym workflow checks cover invitation acceptance, private-by-default journals, scoped coaching access, revocation, research exclusion, recipient-only outcomes, source deletion and owner-account cascading deletion. Local browser creation, plan assignment and recipient feedback succeeded with a synthetic gym/account. Updated full-suite and PostgreSQL results are recorded in the draft PR checks.
+- Gym checkpoint `7627c5f` passed 128 CI checks across SQLite and PostgreSQL 18, plus JavaScript syntax and DOM checks.
+- October 25 weekly planner: 24 focused training/development tests passed locally. New cases cover unresolved-outcome priority, full-drill budgets, exact versus ambiguous written durations, explicit timing overrides, source invalidation, duplicate completion and discipline/research isolation. Synthetic browser checks confirmed changing a drill from five to seven planned minutes rebuilds the week from 24 to 30 minutes without changing actual practice counts or source instructions. Desktop and 390×844 layouts fit without horizontal page overflow.
+- The complete local suite now passes 96 tests. Extended DOM checks pass for weekly outline rendering, safe text, JSON export content, and numeric planning-time submission without marking practice complete. Browser console checks are clear. The in-app browser download-event check timed out, so actual file delivery remains unverified there; exported content is covered by DOM tests. PostgreSQL CI for this checkpoint is tracked in PR #3.
 - Synthetic blank-image abstention was checked during the footage release. This is not a real-athlete coaching accuracy evaluation.
 - Real athlete evaluation requires footage supplied with permission and qualified reviewer judgments; no evaluation data or accuracy figures should be invented.
 

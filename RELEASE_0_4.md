@@ -6,7 +6,7 @@ Prepared October 19, 2026. As of October 20, purchase and deployment are on hold
 
 - Private athlete accounts, persistent profiles and explicit journal saving.
 - Saved footage and manual coaching reports with integrity receipts and separate correction feedback.
-- Practice tracking, evidence-linked reassessment, coverage dashboards and a rules-based personalized practice organizer.
+- Practice tracking, evidence-linked reassessment, coverage dashboards and an outcome-prioritized weekly practice organizer with explicit timing and source links.
 - Athlete-authored tactical systems with an interactive decision explorer.
 - Private opponent/style research notes, cited AI studies from selected confirmed footage, and revocable coach review/comment access.
 - Resumable round reviews up to five minutes with progress, pause, cancellation, explicit retry and private temporary text results.
@@ -37,7 +37,7 @@ After approval: create the database in the existing project/environment, restric
 
 Application tests cover account isolation, password recovery/session revocation, CSRF, report integrity, coach grants/revocation, reassessment constraints, deletion and production refusal to use ephemeral training storage. CI also exercises PostgreSQL 18. The owner authorized local synthetic browser testing on October 20. Desktop/mobile account, footage import/extraction, saving, practice tracking, multi-section processing and research checks have since run; camera and real-athlete coaching quality remain unverified. See VALIDATION.md for the evidence.
 
-Real athlete footage quality evaluation still needs permissioned footage and qualified reviewers. The full long-term vision is the required launch scope. Consecutive sampled round review, cited AI scouting/style studies and gym collaboration are now implemented in working source. Continuous real-time computer vision, a professionally validated tactics library, advanced motion/pose measurements, richer adaptive plans and organizational reporting/integrations remain unfinished; they cannot be silently excluded from launch scope.
+Real athlete footage quality evaluation still needs permissioned footage and qualified reviewers. The full long-term vision is the required launch scope. Consecutive sampled round review, cited AI scouting/style studies, gym collaboration and outcome-adaptive weekly scheduling are now implemented in working source. Scheduling remains rules-based and does not generate new personalized drills. Continuous real-time computer vision, a professionally validated tactics library, advanced motion/pose measurements, AI-generated longitudinal coaching and organizational reporting/integrations remain unfinished; they cannot be silently excluded from launch scope.
 
 ## October 24 additions
 

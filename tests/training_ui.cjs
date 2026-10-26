@@ -15,8 +15,8 @@ async function main(){
   w.matchMedia=()=>({matches:false});w.confirm=()=>true;w.structuredClone=structuredClone;
   const calls=[];
   let athlete={id:'test-athlete',handle:'test_athlete',profile:{display_name:'',discipline:'MMA',experience:'Beginner',stance:'Orthodox',goal:'Balanced exits',style:'',sessions_per_week:3,practice_minutes:15}};
-  let entries=[],systems=[];
-  const plan=()=>({goal:athlete.profile.goal,discipline:athlete.profile.discipline,tasks:[],sessions_per_week:3,practice_minutes:15,reason:'Rules-based organizer.',metrics:{saved_reviews:entries.length,confirmed_reviews:0,practiced_tasks:0,reassessed_tasks:0,reported_improving:0},coverage:[]});
+  let entries=[],systems=[],weeklyFixture=null;
+  const plan=()=>weeklyFixture||({goal:athlete.profile.goal,discipline:athlete.profile.discipline,tasks:[],sessions_per_week:3,practice_minutes:15,reason:'Rules-based organizer.',metrics:{saved_reviews:entries.length,confirmed_reviews:0,practiced_tasks:0,reassessed_tasks:0,reported_improving:0},coverage:[]});
   w.fetch=async(url,options={})=>{
     const method=options.method||'GET',data=options.body?JSON.parse(options.body):null;calls.push({url,method,data});
     let result;
@@ -27,6 +27,7 @@ async function main(){
     else if(url.endsWith('/development'))result=plan();
     else if(url.endsWith('/coaches'))result={coaches:[],athletes:[]};
     else if(url.endsWith('/profile')){athlete.profile=data;result={profile:data};}
+    else if(url.includes('/tasks/')&&method==='POST'){const e=entries.find(e=>url.includes('/'+e.id+'/'));Object.assign(e.tasks[0],data);result={entry:e};}
     else if(url.endsWith('/entries')&&method==='POST'){const e={...data,id:'entry-'+entries.length,created:Date.now(),feedback:{verdict:'unreviewed',correction:''},tasks:[]};entries.unshift(e);result={entry:e};}
     else if(url.endsWith('/entries'))result={entries};
     else if(url.endsWith('/systems')&&method==='POST'){const s={...data,id:'system-1',status:'athlete-authored'};systems.push(s);result={system:s};}
@@ -79,7 +80,26 @@ async function main(){
   await click('Save footage review');
   assert.match(doc.getElementById('trainingStatus').textContent,/Generate a footage review first/);
   assert.equal(doc.querySelector('dialog[open]'),null);
+  // Weekly scheduling is a read-only outline until the athlete explicitly saves practice.
+  const practice={id:'0',name:'<img src=x> drill',instructions:'Controlled fixture instructions.',minutes:5,status:'planned',outcome:'not_checked',notes:'',reassessment_entry:'',success_check:'A visible check.',entry_id:'weekly-source',source_title:'Weekly source',performed_on:'2026-10-25',allocated_minutes:5,priority_reason:'Unfinished confirmed drill.',time_basis:'Time from the saved review',training_type:'drilling'};
+  entries.push({id:'weekly-source',title:'Weekly source',discipline:'MMA',purpose:'self',kind:'note',notes:'UI fixture',report:{},performed_on:'2026-10-25',created:1,minutes:20,training_type:'drilling',feedback:{verdict:'confirmed',correction:''},tasks:[practice]});
+  weeklyFixture={...plan(),tasks:[practice],deferred_tasks:[],improving_tasks:[],weekly_plan:{note:'Flexible sessions.',suggested_review_on:'2026-11-01',generated_on:'2026-10-25',minutes_per_session:5,total_minutes:5,sessions:[{number:1,focus:'Check practice',minutes:5,task_refs:[{entry_id:'weekly-source',task_id:'0'}],check:'Compare later evidence.'}]}};
+  // Switching profile saves refreshes the hub from the API fixture.
+  await click('Profile');await submit(doc.querySelector('form:has([name=display_name])'));await click('Progress');
+  assert.match(doc.getElementById('trainingRoot').textContent,/Your week, with a clear purpose/);
+  assert.match(doc.getElementById('trainingRoot').textContent,/Compare later evidence/);
+  assert.equal(doc.querySelector('#trainingRoot img'),null);
+  let exportedBlob,exportedName;
+  w.URL.createObjectURL=blob=>{exportedBlob=blob;return 'blob:weekly-test';};w.URL.revokeObjectURL=()=>{};
+  w.HTMLAnchorElement.prototype.click=function(){exportedName=this.download;};
+  await click('Download this weekly outline');
+  const exportedText=await new Promise((resolve,reject)=>{const reader=new w.FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsText(exportedBlob);});
+  const exported=JSON.parse(exportedText);assert.equal(exportedName,'fight-iq-weekly-outline.json');assert.equal(exported.snapshot,true);assert.equal(exported.weekly_plan.total_minutes,5);assert.equal(exported.tasks[0].entry_id,'weekly-source');
+  assert.equal(calls.filter(c=>c.url.includes('/tasks/')).length,0,'Exporting a schedule must not record practice');
+  await click('Record practice / reassess');dialog=doc.querySelector('dialog[open]');form=dialog.querySelector('form:has([name=planned_minutes])');
+  form.elements.planned_minutes.value='7';await submit(form);
+  const timing=calls.find(c=>c.url.includes('/tasks/')).data;assert.equal(timing.planned_minutes,7);assert.equal(timing.status,'planned');assert.equal(timing.outcome,'not_checked');
   dom.window.close();
-  console.log('Training UI logic checks passed: profile/XSS, explicit AI context, signed snapshot saving, tactical branches, stale-footage protection.');
+  console.log('Training UI logic checks passed: profile/XSS, explicit AI context, signed snapshots, tactical branches, stale-footage protection, weekly outline/export and explicit planning time.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
