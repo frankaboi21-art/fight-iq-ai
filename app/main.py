@@ -25,6 +25,7 @@ from app.services.scoring_engine import MISTAKES, PILLAR_WEIGHTS, analyze_mistak
 from app.services.training import router as training_router, receipt
 from app.services.round_review import router as round_router, cleanup_loop
 from app.services.research import router as research_router
+from app.services.gyms import router as gym_router
 
 settings = get_settings()
 
@@ -44,6 +45,7 @@ app = FastAPI(title=settings.app_name, version="0.4.0", docs_url=None, redoc_url
 app.include_router(training_router)
 app.include_router(round_router)
 app.include_router(research_router)
+app.include_router(gym_router)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list,
                    allow_credentials=True, allow_methods=["GET", "POST", "DELETE"],
                    allow_headers=["Content-Type", "X-FightIQ-Client"])

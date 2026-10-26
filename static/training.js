@@ -65,8 +65,8 @@
     root.replaceChildren();
     const bar=node('div',undefined,'hub-account-bar');bar.append(node('strong',hub.athlete.profile.display_name||hub.athlete.handle),node('span',`${hub.athlete.profile.discipline} · ${hub.athlete.profile.experience}`,'field-hint'),button('Sign out',async()=>{await post('/logout',{});await refresh();}));root.append(bar);
     const nav=node('nav',undefined,'hub-nav');nav.setAttribute('aria-label','Training hub');
-    ['Progress','Journal','Tactics','Research','Coaches','Profile'].forEach(page=>{const b=button(page,()=>{hub.page=page;render();});b.setAttribute('aria-pressed',String(hub.page===page));nav.append(b);});root.append(nav);
-    ({Progress:renderProgress,Journal:renderJournal,Tactics:renderTactics,Research:renderResearch,Coaches:renderCoaches,Profile:renderProfile})[hub.page]();
+    ['Progress','Journal','Tactics','Research','Gyms','Coaches','Profile'].forEach(page=>{const b=button(page,()=>{hub.page=page;render();});b.setAttribute('aria-pressed',String(hub.page===page));nav.append(b);});root.append(nav);
+    ({Progress:renderProgress,Journal:renderJournal,Tactics:renderTactics,Research:renderResearch,Gyms:renderGyms,Coaches:renderCoaches,Profile:renderProfile})[hub.page]();
   }
   function renderProfile(){
     const panel=section('The athlete behind the footage.','Your profile stays private. Use “Apply to my next review” to place selected details in the visible coaching fields before sending them to AI.');
@@ -203,6 +203,44 @@
     }
     loadStudies().catch(e=>{results.textContent=e.message;});
   }
+  function renderGyms(){
+    const gymApi=(path='',options={})=>api('/api/v1/gyms'+path,options);
+    const send=(path,data={})=>gymApi(path,{method:'POST',body:JSON.stringify(data)});
+    const panel=section('Train together. Keep control of your records.','Joining a gym does not share your journal. You choose whether its current and future active coaches can read and comment on your self-training reviews. Profiles, opponent research and style studies stay private. Roles do not verify coaching qualifications.');
+    const form=node('form',undefined,'hub-form');field(form,'New gym name','name',{required:true,minLength:2,maxLength:80});submit(form,'Create gym workspace',async data=>{await send('',data);form.reset();await loadGyms();});panel.append(form);
+    const list=node('div');panel.append(list,button('Refresh my gyms',loadGyms));root.append(panel);const workspace=node('div');root.append(workspace);
+    async function loadGyms(){const data=await gymApi();list.replaceChildren();if(!data.gyms.length)list.append(node('p','No gyms yet. Create a workspace, or ask its owner to invite your exact username: '+hub.athlete.handle));
+      data.gyms.forEach(g=>{const card=node('article',undefined,'hub-practice');card.append(node('h4',g.name),node('p',`${g.role} · ${g.status}`,'field-hint'));
+        if(g.status==='invited')card.append(button('Accept invitation',async()=>{await send('/'+g.id+'/accept');await loadGyms();await openGym(g.id);}),button('Decline invitation',async()=>{await gymApi(`/${g.id}/members/${hub.athlete.id}`,{method:'DELETE'});await loadGyms();}));
+        else card.append(button('Open gym',()=>openGym(g.id)));list.append(card);});
+    }
+    async function openGym(id){const data=await gymApi('/'+id),g=data.gym;workspace.replaceChildren();const top=section(g.name,`${g.role} workspace · ${data.members.filter(m=>m.status==='active').length} active members`);
+      top.append(node('p',g.sharing?'You are sharing current and future self-training reviews with this gym’s active owner and coaches.':'Your journal is not shared with this gym.'),button(g.sharing?'Stop sharing with this gym':'Share my self-training with this gym',async()=>{if(!g.sharing&&!window.confirm('Allow all current and future active coaches in this gym to read and comment on your current and future self-training reviews and notes? Your profile and research stay private.'))return;await send('/'+id+'/sharing',{sharing:!g.sharing});await openGym(id);}));
+      top.append(node('p','Stopping gym sharing removes this access path. Separate direct coach grants still apply. Existing comments and any copies a coach already made remain.','field-hint'));
+      if(g.role==='owner'){const invite=node('form',undefined,'hub-form');field(invite,'Invite exact username','handle',{required:true,minLength:3,maxLength:32});field(invite,'Gym role','role',{choices:['athlete','coach']});submit(invite,'Invite to gym',async values=>{await send('/'+id+'/members',values);await openGym(id);message('Invitation is visible in their Gyms tab. No external message was sent.');});top.append(invite);}
+      const roster=section('Members','Sharing is controlled by each athlete. Removing a member also deletes plans assigned to them in this gym.');
+      data.members.forEach(m=>{const row=node('article',undefined,'hub-practice');row.append(node('strong',m.handle),node('p',`${m.role} · ${m.status} · ${m.sharing?'training shared':'training private'}`,'field-hint'));
+        if(['owner','coach'].includes(g.role)&&m.status==='active'&&m.sharing)row.append(button('Review '+m.handle,async()=>{const result=await gymApi(`/${id}/athletes/${m.id}/entries`);const reviews=section(m.handle+' — shared reviews');result.entries.forEach(e=>reviews.append(button(e.title,()=>showEntry(e,true))));if(!result.entries.length)reviews.append(node('p','No self-training records saved yet.'));workspace.append(reviews);}));
+        if(g.role==='owner'&&m.id!==g.owner)row.append(button('Remove '+m.handle,async()=>{if(!window.confirm('Remove this membership and its assigned plans? Gym access ends immediately; separate coach grants are unchanged.'))return;await gymApi(`/${id}/members/${m.id}`,{method:'DELETE'});await openGym(id);}));roster.append(row);});
+      workspace.append(top,roster);
+      if(['owner','coach'].includes(g.role)){
+        const assign=section('Create a shared training plan.','Coach-authored plans describe controlled practice and a visible success check. The recipient records their own outcome.');const planForm=node('form',undefined,'hub-form');
+        const recipient=field(planForm,'Plan recipient','recipient',{choices:data.members.filter(m=>m.status==='active').map(m=>({label:m.handle,value:m.id}))});
+        field(planForm,'Plan title','title',{required:true,maxLength:100});field(planForm,'Plan discipline','discipline',{choices:disciplines});
+        field(planForm,'Plan goal','goal',{required:true,lines:2,maxLength:600});field(planForm,'Controlled practice instructions','practice',{required:true,lines:3,maxLength:2000});field(planForm,'Plan success check','success_check',{required:true,lines:2,maxLength:500});field(planForm,'Review together on','review_date',{type:'date',required:true,value:localDate()});
+        const source=field(planForm,'Link a shared review (optional)','entry_id',{choices:[{label:'No linked review',value:''}]});let sourceRevision=0;
+        async function loadSources(){const revision=++sourceRevision;source.replaceChildren(new Option('No linked review',''));const selected=data.members.find(m=>m.id===recipient.value);if(!selected?.sharing)return;try{const result=await gymApi(`/${id}/athletes/${selected.id}/entries`);if(revision!==sourceRevision)return;result.entries.forEach(e=>source.append(new Option(e.title,e.id)));}catch(e){message(e.message,true);}}
+        recipient.addEventListener('change',loadSources);loadSources();submit(planForm,'Assign shared plan',async values=>{await send('/'+id+'/plans',values);await openGym(id);});assign.append(planForm);workspace.append(assign);
+      }
+      const plans=section('Shared plans','Completion and feedback are self-reported. A completed plan is not proof of technical improvement.');if(!data.plans.length)plans.append(node('p','No plans assigned yet.'));
+      data.plans.forEach(p=>{const card=node('article',undefined,'hub-practice');const recipient=data.members.find(m=>m.id===p.recipient);card.append(node('h4',p.title),node('p',`${p.discipline} · for ${recipient?.handle||'member'} · by ${p.author_handle} · ${p.status}`,'field-hint'),node('p','Goal: '+p.goal),node('p',p.practice),node('strong','Success check: '+p.success_check),node('p','Review date: '+p.review_date));if(p.notes)card.append(node('p','Athlete feedback: '+p.notes));
+        if(p.recipient===hub.athlete.id){const feedback=node('form',undefined,'hub-form');field(feedback,'My plan status','status',{choices:['accepted','completed','needs_revision'],value:p.status==='assigned'?'accepted':p.status});field(feedback,'My plan feedback','notes',{lines:2,maxLength:1000,value:p.notes});submit(feedback,'Save plan feedback',async values=>{await send(`/${id}/plans/${p.id}/feedback`,values);await openGym(id);});card.append(feedback);}
+        if(g.role==='owner'||(g.role==='coach'&&p.author_id===hub.athlete.id))card.append(button('Delete shared plan',async()=>{if(!window.confirm('Delete this shared plan and its feedback for everyone in the gym?'))return;await gymApi(`/${id}/plans/${p.id}`,{method:'DELETE'});await openGym(id);}));plans.append(card);});workspace.append(plans);
+      const events=section('Access and activity','The latest 100 recorded actions. Owners see gym activity; other members see actions they performed or that concern their records.');data.audit.forEach(e=>events.append(node('p',`${new Date(e.created*1000).toLocaleString()} · ${e.actor} · ${e.action.replaceAll('_',' ')}${e.subject?' · '+e.subject:''}`,'field-hint')));workspace.append(events);
+      workspace.append(button(g.role==='owner'?'Delete gym workspace':'Leave this gym',async()=>{if(!window.confirm(g.role==='owner'?'Permanently delete this gym, its memberships, shared plans and audit history? Personal journals remain.':'Leave this gym and remove its plans assigned to you? Gym access ends; separate coach grants are unchanged.'))return;await gymApi(g.role==='owner'?'/'+id:`/${id}/members/${hub.athlete.id}`,{method:'DELETE'});workspace.replaceChildren();await loadGyms();}));
+    }
+    loadGyms().catch(e=>{list.textContent=e.message;});
+  }
   function renderTactics(){
     const panel=section('Build a system, not a collection of moves.','Describe a situation, choose an action, and map two possible responses with a defensive exit. These are athlete-authored training hypotheses; review them with your coach.');
     panel.append(button('Create a tactical system',()=>systemEditor()));
@@ -229,7 +267,7 @@
     const close=node('button','Close system','button quiet');close.type='button';close.addEventListener('click',()=>dialog.close());dialog.append(close);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
   }
   function deleteAccount(){
-    const dialog=node('dialog');dialog.setAttribute('aria-label','Delete athlete account');const f=node('form',undefined,'hub-form');f.append(node('h2','Delete your athlete account?'),node('p','This permanently deletes your active profile, saved reviews, practice history, tactical systems, comments and sharing grants. Provider backups follow their retention policy. Download your archive first if you need it.'));
+    const dialog=node('dialog');dialog.setAttribute('aria-label','Delete athlete account');const f=node('form',undefined,'hub-form');f.append(node('h2','Delete your athlete account?'),node('p','This permanently deletes your active profile, saved reviews, practice history, tactical systems, research, temporary round results, comments and sharing grants. Gyms you own and their shared plans are also deleted. Provider backups follow their retention policy. Download your archive first if you need it.'));
     field(f,'Your password','password',{type:'password',required:true,maxLength:128,autocomplete:'current-password'});field(f,'Type DELETE to confirm','confirmation',{required:true,maxLength:6});
     submit(f,'Permanently delete my account',async data=>{await post('/delete-account',data);f.reset();dialog.close();await refresh();message('Your athlete account and active records have been deleted.');});const cancel=node('button','Cancel','button quiet');cancel.type='button';cancel.addEventListener('click',()=>dialog.close());f.append(cancel);dialog.append(f);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
   }

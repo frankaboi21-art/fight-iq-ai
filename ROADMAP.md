@@ -2,7 +2,7 @@
 
 This roadmap turns the [product vision](PRODUCT_VISION.md) into an implementation sequence. These are planned milestones, not delivered features or promised dates. Work should complete and validate the core training loop before expanding into scouting or real-time coaching.
 
-**October 24, 2026 implementation status:** working source implements accounts/journals, a rules-based practice organizer and linked reassessment, athlete-authored tactics, coach review/comments, resumable consecutive-section round reviews, and cited AI scouting/style studies from selected saved evidence. Purchase and deployment remain on hold until the full long-term scope is implemented, polished and validated. Continuous vision, gym administration, richer adaptive planning and professionally reviewed tactical content remain unfinished. Local synthetic browser checks have started; they do not establish coaching accuracy. See [readiness evidence](VALIDATION.md).
+**October 24, 2026 implementation status:** working source implements accounts/journals, a rules-based practice organizer and linked reassessment, athlete-authored tactics, coach review/comments, resumable consecutive-section round reviews, cited AI scouting/style studies, and gym memberships, shared plans and access audits. Purchase and deployment remain on hold until the full long-term scope is implemented, polished and validated. Continuous vision, richer adaptive planning, organizational reporting/integrations and professionally reviewed tactical content remain unfinished. Local synthetic browser checks have started; they do not establish coaching accuracy. See [readiness evidence](VALIDATION.md).
 
 ## 1. Establish trustworthy footage coaching
 

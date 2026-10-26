@@ -436,6 +436,11 @@ def delete_entry(entry_id: str, request: Request):
             if system["entry_id"] == entry_id:
                 system["entry_id"] = ""
                 db.execute("UPDATE tactical_systems SET data=? WHERE id=? AND athlete=?", (json.dumps(system), system["id"], owner))
+        for row in db.execute("SELECT data FROM gym_plans WHERE recipient=?", (owner,)).fetchall():
+            plan = json.loads(row[0])
+            if plan.get("entry_id") == entry_id:
+                plan["entry_id"] = ""
+                db.execute("UPDATE gym_plans SET data=? WHERE id=?", (json.dumps(plan), plan["id"]))
     return {"deleted": True}
 
 
@@ -491,6 +496,7 @@ def plan(request: Request):
 @router.get("/export")
 def export(request: Request):
     from app.services.research import records as research_records
+    from app.services.gyms import archive as gym_archive
     with database.transaction() as db:
         athlete = account(request, db)
         comments = db.execute("SELECT c.entry,a.handle,c.body,c.created FROM coach_comments c JOIN training_entries e ON c.entry=e.id JOIN athletes a ON c.author=a.id WHERE e.athlete=?", (athlete["id"],)).fetchall()
@@ -499,6 +505,7 @@ def export(request: Request):
                 "systems": [json.loads(r[0]) for r in db.execute("SELECT data FROM tactical_systems WHERE athlete=?", (athlete["id"],)).fetchall()],
                 "temporary_round_reviews": [{k: v for k, v in json.loads(r[0]).items() if k != "lease"} for r in db.execute("SELECT data FROM round_jobs WHERE athlete=? AND created>?", (athlete["id"], time.time()-7*86400)).fetchall()],
                 "research_studies": research_records(db, athlete["id"]),
+                "gym_collaboration": gym_archive(db, athlete["id"]),
                 "comments": [{"entry": c[0], "author": c[1], "body": c[2], "created": c[3]} for c in comments]}
 
 
@@ -561,13 +568,20 @@ def shared_entries(owner: str, request: Request):
 
 
 def comment_access(request, db, entry_id):
+    from app.services.gyms import gym_access, access_audit
     author = account(request, db)
     row = db.execute("SELECT athlete,data FROM training_entries WHERE id=?", (entry_id,)).fetchone()
     if not row:
         raise HTTPException(404, "Review not found.")
     db.lock_owner(row[0])
-    if row[0] != author["id"] and (json.loads(row[1])["purpose"] != "self" or not db.execute("SELECT owner FROM coach_grants WHERE owner=? AND coach=?", (row[0], author["id"])).fetchone()):
-        raise HTTPException(404, "Review not found.")
+    if row[0] != author["id"]:
+        if json.loads(row[1])["purpose"] != "self":
+            raise HTTPException(404, "Review not found.")
+        direct = db.execute("SELECT owner FROM coach_grants WHERE owner=? AND coach=?", (row[0], author["id"])).fetchone()
+        if not direct:
+            if not gym_access(db, author["id"], row[0]):
+                raise HTTPException(404, "Review not found.")
+            access_audit(db, author["id"], row[0])
     return author
 
 
