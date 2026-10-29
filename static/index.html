@@ -5,25 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#101412">
 <meta name="description" content="Turn your training observations into a focused plan for your next round. Six-pillar session reviews and practical AI corner coaching.">
-<title>Fight IQ AI — Your next round, smarter</title>
+<title>Fight IQ AI — Train with intelligence</title>
 <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
-<link rel="stylesheet" href="/static/styles.css?v=3">
-<script src="/static/app.js?v=3" defer></script>
-<script src="/static/video.js?v=3" defer></script>
+<link rel="stylesheet" href="/static/styles.css?v=4">
+<script src="/static/app.js?v=4&amp;rev=1" defer></script>
+<script src="/static/video.js?v=4&amp;rev=3" defer></script>
+  <script src="/static/training.js?v=4&amp;rev=7" defer></script>
+<script src="/static/live.js?v=1" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#review">Skip to session review</a>
 <div class="shell">
 <header class="topbar">
 <a class="brand" href="/" aria-label="Fight IQ AI home"><img src="/static/icon.svg" width="38" height="38" alt=""><span>FIGHT IQ<span class="brand-ai">AI</span></span></a>
-<nav aria-label="Main navigation"><a href="#footage" class="active">Footage lab</a><a href="#review">Session review</a><a href="#corner">AI Corner</a></nav>
+<nav aria-label="Main navigation"><a href="#training" class="active">My development</a><a href="#footage">Footage lab</a><a href="#live">Live practice</a><a href="#review">Session review</a><a href="#corner">AI Corner</a></nav>
 <button class="button quiet access-button" id="accessButton" type="button">Unlock AI Corner <span aria-hidden="true">↗</span></button>
 </header>
 <main>
 <section class="hero" aria-labelledby="heroTitle">
-<div><p class="eyebrow"><span class="status-dot"></span> THE THINKING FIGHTER'S CORNER</p><h1 id="heroTitle">Better decisions.<br><span>Better rounds.</span></h1><p class="hero-copy">Watch your rounds. Understand your choices.<br>Take one clear improvement into your next session.</p></div>
+<div><p class="eyebrow"><span class="status-dot"></span> THE INTELLIGENT FUTURE OF COMBAT SPORTS</p><h1 id="heroTitle">Train with intelligence.<br><span>Fight with purpose.</span></h1><p class="hero-copy">Watch your rounds. Understand your choices.<br>Take one clear improvement into your next session.</p></div>
 <aside class="hero-note"><span class="mini-label">THE METHOD</span><p>Observe.<br>Understand.<br><strong>Adjust.</strong></p><span>Watch. Learn. Take it to the mat.</span></aside>
 </section>
+<section id="training" class="training-section" aria-labelledby="trainingTitle"><div class="section-heading"><div><p class="eyebrow">YOUR DEVELOPMENT HUB</p><h2 id="trainingTitle">Evolve with every session.</h2></div><span class="tag">ATHLETE JOURNAL</span></div><p class="footage-intro">Keep your goals, reviews, practice and tactical systems together. Save only what you choose; original videos and frames are never saved to your account.</p><div id="trainingStatus" class="feedback" role="status" aria-live="polite">Loading your training space…</div><div id="trainingRoot"></div></section>
 <section id="footage" class="footage-section" aria-labelledby="footageTitle">
 <div class="section-heading"><div><p class="eyebrow">THE FOOTAGE LAB</p><h2 id="footageTitle">See the moment. Build your game.</h2></div><span class="tag">VIDEO BETA</span></div>
 <p class="footage-intro">Boxing, striking, MMA, BJJ and wrestling. Bring a round from training, choose the athlete, and turn a short exchange into purposeful practice.</p>
@@ -49,10 +52,19 @@
 <p class="field-hint">Use clothing and starting position. If you're training alone, say so. No names needed.</p>
 <label for="videoGoal">What should your corner focus on?</label><textarea id="videoGoal" rows="3" maxlength="600" placeholder="Example: cleaner exits after my combinations, or retaining guard under pressure."></textarea>
 <label class="consent-check"><input id="videoConsent" type="checkbox" required><span>I have permission to share this footage for analysis. Send the selected frames and these details to OpenAI.</span></label>
-<p class="field-hint">The original video stays on your device. Selected frames pass through this app to OpenAI; this app doesn't save the footage or review. Download your notes to keep them.</p>
+<p class="field-hint">The original video stays on your device. Selected frames pass through this app to OpenAI; frames and videos are not saved. Reviews stay in this tab unless you choose to save the text to your athlete journal.</p>
 <button class="button primary" type="submit" id="reviewVideo" disabled>Review this section ↗</button><p class="field-hint">Beta access required · 2 reviews per 15 minutes · Shared service limits: 3/hour, 10/day.</p>
 </fieldset></form><div class="video-method"><strong>Evidence before advice.</strong><p>Timestamped moments, strengths and corrections, skills to explore, and a practical training plan. Unclear footage will be marked as uncertain.</p></div>
 </div></div>
+<section class="panel hub-panel" aria-labelledby="roundTitle">
+<p class="eyebrow">LONGER ROUND REVIEW · EXPERIMENTAL</p><h3 id="roundTitle">Follow the whole round.</h3>
+<p>Review up to five minutes in consecutive sections at 5 sampled frames per second. Each section is analyzed separately; athlete identity is not tracked across sections. A five-minute round uses up to 30 AI requests and may take several minutes.</p>
+<p class="field-hint">Sign in to an athlete account. Text results and the file name stay privately in your account for seven days so you can resume; original video and images are never stored. Save the completed index to your journal if you want to keep it. Closing this tab pauses new sections. An already submitted section can finish in the background.</p>
+<label for="roundLength">Round length from selected start (seconds)</label><input id="roundLength" type="number" min="1" max="300" value="180" step="1">
+<label class="consent-check"><input id="roundConsent" type="checkbox"><span>Process these sections with AI and keep temporary text results in my account for seven days.</span></label>
+<div class="plan-toolbar"><button class="button secondary" id="prepareRound" type="button">Prepare round review</button><button class="button quiet" id="loadRounds" type="button">My recent round reviews</button><button class="button quiet" id="pauseRound" type="button" hidden>Pause after this section</button><button class="button quiet" id="cancelRound" type="button" hidden>Cancel round review</button></div>
+<p id="roundStatus" role="status" aria-live="polite"></p><progress id="roundProgress" max="30" value="0" aria-label="Round sections completed" hidden></progress><div id="roundJobs"></div><div id="roundResults"></div>
+</section>
 <div id="videoStatus" class="feedback" role="status" aria-live="polite" hidden></div>
 <progress id="videoProgress" max="50" value="0" aria-label="Frames prepared" hidden></progress>
 <div id="frameStrip" class="frame-strip" aria-label="Frames included in the last review" hidden></div>
@@ -61,6 +73,23 @@
 <p class="training-note">AI can miss fast transitions or misread technique. Review the evidence with a qualified coach before changing your training. This is coaching support, not an injury assessment.</p>
 </section>
 
+<section id="live" class="panel hub-panel" aria-labelledby="liveTitle">
+<p class="eyebrow">LIVE PRACTICE · EXPERIMENTAL</p><h2 id="liveTitle">Practice. Pause. Check your next adjustment.</h2>
+<p>Sample a running camera or a prerecorded video in four-second windows. Feedback arrives after processing, which may take up to 85 seconds. This is near-live visual review, not continuous motion tracking or instant coaching.</p>
+<div class="footage-grid"><div><video id="liveVideo" class="fight-video" playsinline muted aria-label="Live practice preview"></video><p id="liveStatus" role="status" aria-live="polite">Choose a source. Nothing is being captured or sent.</p><p id="liveTiming" class="field-hint"></p></div>
+<form id="liveForm"><fieldset id="liveFields" class="bare-fieldset">
+<label for="liveSource">Practice source</label><select id="liveSource"><option value="file">Prerecorded playback</option><option value="camera">Live camera (no microphone)</option></select>
+<label for="liveFile">Choose live practice footage</label><input id="liveFile" type="file" accept="video/*,.mp4,.webm,.mov">
+<label for="liveDiscipline">Live discipline</label><select id="liveDiscipline"><option>MMA</option><option>Boxing</option><option>Muay Thai</option><option>Kickboxing</option><option>Brazilian Jiu-Jitsu</option><option>Wrestling</option></select>
+<label for="liveExperience">Live experience</label><select id="liveExperience"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
+<label for="liveAthlete">Athlete to follow in live practice</label><input id="liveAthlete" minlength="3" maxlength="200" required placeholder="Clothing and starting position; no names needed">
+<label for="liveGoal">Live practice focus</label><textarea id="liveGoal" maxlength="600" rows="2"></textarea>
+<label for="liveWindows">Maximum windows this session</label><select id="liveWindows"><option value="1">1 window</option><option value="3" selected>3 windows</option><option value="6">6 windows</option></select>
+<label class="consent-check"><input id="liveConsent" type="checkbox" required><span>I have permission to process everyone shown. Send sampled frames and these details to OpenAI during this session. Use controlled drills and check feedback between attempts.</span></label>
+<button type="submit" id="startLive" class="button primary">Start live practice</button></fieldset></form></div>
+<button type="button" id="stopLive" class="button secondary" disabled>Stop capture &amp; feedback</button>
+<p class="field-hint">Three-minute limit. One window at a time, no background queue or automatic retries. Capture stops if this tab is hidden. No audio, video recording or automatic journal saving. Already submitted work may still consume usage after stopping. Shared service allowance: 12 windows/hour and 24/day; six per athlete per 15 minutes.</p>
+<div id="liveResults"></div></section>
 <div class="section-heading" id="review"><div><p class="eyebrow">01 / SESSION REVIEW</p><h2>Every round has a lesson.</h2></div><span class="tag" id="sessionTag">Your session</span></div>
 <div class="review-grid">
 <section class="panel log-panel" aria-labelledby="logTitle">
@@ -100,7 +129,7 @@
 <p class="training-note">Use this as a review tool alongside a qualified coach. Keep practice controlled and appropriate to your experience.</p>
 </section>
 </main>
-<footer><a class="brand footer-brand" href="/">FIGHT IQ <span class="brand-ai">AI</span></a><span>Train with intent.</span><span>Beta 0.3 · Sessions stay in this tab until closed or refreshed.</span></footer>
+<footer><a class="brand footer-brand" href="/">FIGHT IQ <span class="brand-ai">AI</span></a><span>Evolve with every session.</span><span>Beta 0.4 · Save chosen text reviews to your private journal.</span></footer>
 </div>
 <dialog id="accessDialog" aria-labelledby="accessTitle"><form id="accessForm"><div class="dialog-top"><span class="eyebrow">INVITE-ONLY BETA</span><button class="icon-button" id="closeAccess" type="button" aria-label="Close access dialog">×</button></div><h2 id="accessTitle">Step into your corner.</h2><p>Use the beta access code shared by the app owner. Your OpenAI API key is never needed here.</p><label for="accessCode">Beta access code</label><input id="accessCode" type="password" autocomplete="current-password" required maxlength="256"><p id="accessError" class="error-text" role="alert"></p><button class="button primary" type="submit" id="unlockButton">Unlock AI Corner</button><p class="field-hint">Access lasts up to 8 hours on this browser. Shared service allowances also apply.</p></form></dialog>
 </body>
