@@ -156,8 +156,11 @@ def attach_evidence(review: FootageReview, payload: VideoRequest) -> dict:
             moment["timestamp"] = payload.frames[numbers[0] - 1].timestamp
             moment["end_timestamp"] = payload.frames[numbers[-1] - 1].timestamp
         result["moments"].sort(key=lambda item: item["timestamp"])
+    live = type(payload).__name__ == "LiveWindow"
     result["coverage"] = {"start": payload.start, "end": payload.end,
-                          "frames": len(payload.frames), "sample_fps": 5}
+                          "frames": len(payload.frames), "sample_fps": round(len(payload.frames)/(payload.end-payload.start),2) if live else 5}
+    if live:
+        result["coverage"].update(mode="near-live", timing="Actual browser capture times; sampling may vary")
     return result
 
 
@@ -172,7 +175,7 @@ async def generate_footage_review(payload: VideoRequest) -> dict:
         ])
     async with AsyncOpenAI(api_key=cfg.openai_api_key, timeout=80, max_retries=0) as client:
         response = await client.responses.parse(
-            model=cfg.openai_model, instructions=VIDEO_INSTRUCTIONS,
+            model=cfg.openai_model, instructions=VIDEO_INSTRUCTIONS.replace("sampled at 5 fps", "captured at approximately 5 fps with actual timestamps") if type(payload).__name__ == "LiveWindow" else VIDEO_INSTRUCTIONS,
             input=[{"role": "user", "content": content}], text_format=FootageReview,
             max_output_tokens=4500, store=False,
             **({"reasoning": {"effort": "low"}} if cfg.openai_model.startswith("gpt-6") else {}),

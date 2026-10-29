@@ -33,6 +33,7 @@ async function main(){
     else if(url.endsWith('/systems')&&method==='POST'){const s={...data,id:'system-1',status:'athlete-authored'};systems.push(s);result={system:s};}
     else if(url.endsWith('/systems'))result={systems};
     else if(url.endsWith('/comments'))result={comments:[]};
+    else if(url.startsWith('/api/v1/validation/entries/'))result={reviews:[],review_gyms:[],source_fingerprint:'a'.repeat(64)};
     else throw new Error('Unexpected mocked request: '+url);
     return {ok:true,status:200,json:async()=>result,headers:{get:()=>null}};
   };

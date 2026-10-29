@@ -44,6 +44,8 @@ main.generate_footage_review = synthetic_review
 main.generate_corner_advice = synthetic_corner
 from app.services import round_review
 round_review.generate_footage_review = synthetic_review
+from app.services import live_review
+live_review.generate_footage_review = synthetic_review
 from app.services import research
 
 

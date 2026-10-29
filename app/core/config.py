@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     training_db_path: str = ".data/training.sqlite3"
     round_hourly_limit: int = Field(default=30, ge=1, le=120)
     round_daily_limit: int = Field(default=60, ge=1, le=300)
+    live_hourly_limit: int = Field(default=12, ge=1, le=120)
+    live_daily_limit: int = Field(default=24, ge=1, le=300)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

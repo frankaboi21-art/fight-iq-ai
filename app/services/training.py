@@ -53,6 +53,7 @@ class Profile(Strict):
     style: str = Field(default="", max_length=200)
     sessions_per_week: int = Field(default=3, ge=1, le=7)
     practice_minutes: int = Field(default=15, ge=5, le=60)
+    coaching_policy: Literal["confirmed_advice", "coach_supported_only"] = "confirmed_advice"
 
 
 class EntryInput(Strict):
@@ -466,15 +467,23 @@ def development(profile, entries):
 
 @router.get("/development")
 def plan(request: Request):
+    from app.services.validation import archive, task_decision
     with database.transaction() as db:
         athlete = account(request, db)
-        return development(athlete["profile"], load_entries(db, athlete["id"]))
+        entries = load_entries(db, athlete["id"])
+        human_reviews = archive(db,athlete['id'],entries)
+        for entry in entries:
+            reviews = human_reviews[entry['id']]
+            for i, task in enumerate(entry['tasks']):
+                task['coach_review'] = task_decision(reviews,i)
+        return development(athlete["profile"], entries)
 
 
 @router.get("/export")
 def export(request: Request):
     from app.services.research import records as research_records
     from app.services.gyms import archive as gym_archive
+    from app.services.validation import archive as human_archive
     with database.transaction() as db:
         athlete = account(request, db)
         comments = db.execute("SELECT c.entry,a.handle,c.body,c.created FROM coach_comments c JOIN training_entries e ON c.entry=e.id JOIN athletes a ON c.author=a.id WHERE e.athlete=?", (athlete["id"],)).fetchall()
@@ -484,6 +493,7 @@ def export(request: Request):
                 "temporary_round_reviews": [{k: v for k, v in json.loads(r[0]).items() if k != "lease"} for r in db.execute("SELECT data FROM round_jobs WHERE athlete=? AND created>?", (athlete["id"], time.time()-7*86400)).fetchall()],
                 "research_studies": research_records(db, athlete["id"]),
                 "gym_collaboration": gym_archive(db, athlete["id"]),
+                "human_reviews": human_archive(db,athlete['id'],load_entries(db,athlete['id'])),
                 "comments": [{"entry": c[0], "author": c[1], "body": c[2], "created": c[3]} for c in comments]}
 
 

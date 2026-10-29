@@ -26,6 +26,8 @@ from app.services.training import router as training_router, receipt
 from app.services.round_review import router as round_router, cleanup_loop
 from app.services.research import router as research_router
 from app.services.gyms import router as gym_router
+from app.services.live_review import router as live_router, cleanup_loop as live_cleanup_loop
+from app.services.validation import router as validation_router
 
 settings = get_settings()
 
@@ -33,12 +35,16 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app):
     cleanup = asyncio.create_task(cleanup_loop())
+    live_cleanup = asyncio.create_task(live_cleanup_loop())
     try:
         yield
     finally:
         cleanup.cancel()
+        live_cleanup.cancel()
         with suppress(asyncio.CancelledError):
             await cleanup
+        with suppress(asyncio.CancelledError):
+            await live_cleanup
 
 
 app = FastAPI(title=settings.app_name, version="0.4.0", docs_url=None, redoc_url=None, lifespan=lifespan)
@@ -46,6 +52,8 @@ app.include_router(training_router)
 app.include_router(round_router)
 app.include_router(research_router)
 app.include_router(gym_router)
+app.include_router(live_router)
+app.include_router(validation_router)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list,
                    allow_credentials=True, allow_methods=["GET", "POST", "DELETE"],
                    allow_headers=["Content-Type", "X-FightIQ-Client"])
@@ -58,7 +66,7 @@ class BodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["method"] not in {"POST", "PUT", "PATCH"}:
             return await self.app(scope, receive, send)
-        video_request = scope["path"] == "/api/v1/video/review" or (scope["path"].startswith("/api/v1/rounds/") and "/sections/" in scope["path"])
+        video_request = scope["path"] == "/api/v1/video/review" or (scope["path"].startswith("/api/v1/rounds/") and "/sections/" in scope["path"]) or (scope["path"].startswith("/api/v1/live/") and scope["path"].endswith("/window"))
         if video_request:
             # Reject anonymous image uploads before buffering or decoding them.
             try:

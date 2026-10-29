@@ -10,14 +10,15 @@
 <link rel="stylesheet" href="/static/styles.css?v=4">
 <script src="/static/app.js?v=4&amp;rev=1" defer></script>
 <script src="/static/video.js?v=4&amp;rev=3" defer></script>
-  <script src="/static/training.js?v=4&amp;rev=6" defer></script>
+  <script src="/static/training.js?v=4&amp;rev=7" defer></script>
+<script src="/static/live.js?v=1" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#review">Skip to session review</a>
 <div class="shell">
 <header class="topbar">
 <a class="brand" href="/" aria-label="Fight IQ AI home"><img src="/static/icon.svg" width="38" height="38" alt=""><span>FIGHT IQ<span class="brand-ai">AI</span></span></a>
-<nav aria-label="Main navigation"><a href="#training" class="active">My development</a><a href="#footage">Footage lab</a><a href="#review">Session review</a><a href="#corner">AI Corner</a></nav>
+<nav aria-label="Main navigation"><a href="#training" class="active">My development</a><a href="#footage">Footage lab</a><a href="#live">Live practice</a><a href="#review">Session review</a><a href="#corner">AI Corner</a></nav>
 <button class="button quiet access-button" id="accessButton" type="button">Unlock AI Corner <span aria-hidden="true">↗</span></button>
 </header>
 <main>
@@ -72,6 +73,23 @@
 <p class="training-note">AI can miss fast transitions or misread technique. Review the evidence with a qualified coach before changing your training. This is coaching support, not an injury assessment.</p>
 </section>
 
+<section id="live" class="panel hub-panel" aria-labelledby="liveTitle">
+<p class="eyebrow">LIVE PRACTICE · EXPERIMENTAL</p><h2 id="liveTitle">Practice. Pause. Check your next adjustment.</h2>
+<p>Sample a running camera or a prerecorded video in four-second windows. Feedback arrives after processing, which may take up to 85 seconds. This is near-live visual review, not continuous motion tracking or instant coaching.</p>
+<div class="footage-grid"><div><video id="liveVideo" class="fight-video" playsinline muted aria-label="Live practice preview"></video><p id="liveStatus" role="status" aria-live="polite">Choose a source. Nothing is being captured or sent.</p><p id="liveTiming" class="field-hint"></p></div>
+<form id="liveForm"><fieldset id="liveFields" class="bare-fieldset">
+<label for="liveSource">Practice source</label><select id="liveSource"><option value="file">Prerecorded playback</option><option value="camera">Live camera (no microphone)</option></select>
+<label for="liveFile">Choose live practice footage</label><input id="liveFile" type="file" accept="video/*,.mp4,.webm,.mov">
+<label for="liveDiscipline">Live discipline</label><select id="liveDiscipline"><option>MMA</option><option>Boxing</option><option>Muay Thai</option><option>Kickboxing</option><option>Brazilian Jiu-Jitsu</option><option>Wrestling</option></select>
+<label for="liveExperience">Live experience</label><select id="liveExperience"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
+<label for="liveAthlete">Athlete to follow in live practice</label><input id="liveAthlete" minlength="3" maxlength="200" required placeholder="Clothing and starting position; no names needed">
+<label for="liveGoal">Live practice focus</label><textarea id="liveGoal" maxlength="600" rows="2"></textarea>
+<label for="liveWindows">Maximum windows this session</label><select id="liveWindows"><option value="1">1 window</option><option value="3" selected>3 windows</option><option value="6">6 windows</option></select>
+<label class="consent-check"><input id="liveConsent" type="checkbox" required><span>I have permission to process everyone shown. Send sampled frames and these details to OpenAI during this session. Use controlled drills and check feedback between attempts.</span></label>
+<button type="submit" id="startLive" class="button primary">Start live practice</button></fieldset></form></div>
+<button type="button" id="stopLive" class="button secondary" disabled>Stop capture &amp; feedback</button>
+<p class="field-hint">Three-minute limit. One window at a time, no background queue or automatic retries. Capture stops if this tab is hidden. No audio, video recording or automatic journal saving. Already submitted work may still consume usage after stopping. Shared service allowance: 12 windows/hour and 24/day; six per athlete per 15 minutes.</p>
+<div id="liveResults"></div></section>
 <div class="section-heading" id="review"><div><p class="eyebrow">01 / SESSION REVIEW</p><h2>Every round has a lesson.</h2></div><span class="tag" id="sessionTag">Your session</span></div>
 <div class="review-grid">
 <section class="panel log-panel" aria-labelledby="logTitle">

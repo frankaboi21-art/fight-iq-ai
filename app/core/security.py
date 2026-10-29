@@ -108,6 +108,8 @@ def consume_allowance(kind: str, identity: str) -> dict:
         limits = [(10, 86400, None), (3, 3600, None), (2, 900, identity)]
     elif kind == "round":
         limits = [(cfg.round_daily_limit, 86400, None), (cfg.round_hourly_limit, 3600, None), (36, 86400, identity)]
+    elif kind == "live":
+        limits = [(cfg.live_daily_limit, 86400, None), (cfg.live_hourly_limit, 3600, None), (6, 900, identity)]
     else:
         limits = [(cfg.coach_daily_limit, 86400, None),
                   (cfg.coach_hourly_limit, 3600, None), (3, 900, identity)]

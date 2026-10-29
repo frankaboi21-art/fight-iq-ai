@@ -31,7 +31,8 @@ def organize(profile, confirmed):
                     "performed_on": entry["performed_on"], "training_type": entry["training_type"],
                     "source_correction": entry["feedback"].get("correction", ""),
                     "revisit": task["status"] == "reassessed"}
-            if task["status"] == "reassessed" and task["outcome"] == "improving":
+            coach_status = task.get('coach_review',{}).get('status','unreviewed')
+            if task["status"] == "reassessed" and task["outcome"] == "improving" and coach_status!='needs_coach_resolution':
                 completed.append(item)
                 continue
             if task["status"] == "reassessed":
@@ -52,7 +53,12 @@ def organize(profile, confirmed):
     selected, deferred, used = [], [], 0
     for task in candidates:
         minutes = task["allocated_minutes"]
-        if minutes is None:
+        coach_status=task.get('coach_review',{}).get('status','unreviewed')
+        if coach_status=='needs_coach_resolution':
+            why = "A coach corrected, rejected or marked this drill uncertain. Review the human feedback before using the original AI instructions."
+        elif profile.get('coaching_policy')=='coach_supported_only' and coach_status!='coach_supported':
+            why = "Your profile requires a current coach-supported drill. Ask a qualified gym coach to review this item."
+        elif minutes is None:
             why = "The saved duration is not an exact number of minutes. Choose a time in the source review."
         elif minutes > profile["practice_minutes"]:
             why = "The full drill exceeds your session budget. Review its timing or update your availability."
