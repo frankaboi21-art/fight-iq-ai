@@ -126,3 +126,18 @@ def test_leaving_revokes_exported_plan_access_and_owner_deletion_cascades(client
     with database.transaction() as db:
         for table in ['gyms','gym_members','gym_plans','gym_audit']:
             assert db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0]==0
+
+
+def test_owner_deletion_preserves_other_gym_audit_with_anonymous_actor(client):
+    users,gym=active_team(client)
+    switch(client,users,'gym_coach')
+    other=client.post('/api/v1/gyms',json={'name':'Surviving gym'},headers=HEADERS).json()['gym']['id']
+    invite(client,other,'gym_owner','coach')
+    switch(client,users,'gym_owner');accept(client,other)
+    assert client.post('/api/v1/training/delete-account',json={'password':PASSWORD,'confirmation':'DELETE'},headers=HEADERS).status_code==200
+    switch(client,users,'gym_coach')
+    assert client.get('/api/v1/gyms/'+gym).status_code==404
+    assert client.get('/api/v1/gyms/'+other).status_code==200
+    with database.transaction() as db:
+        assert not db.execute('SELECT id FROM gym_audit WHERE gym=?',(gym,)).fetchone()
+        assert db.execute('SELECT id FROM gym_audit WHERE gym=? AND actor IS NULL',(other,)).fetchone()

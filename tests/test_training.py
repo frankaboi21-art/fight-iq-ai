@@ -26,6 +26,9 @@ def client(request, tmp_path, monkeypatch):
     monkeypatch.setattr(cfg, 'public_origin', '')
     monkeypatch.setattr(cfg, 'render_external_url', '')
     with database.transaction() as db:
+        # Clear gym children before bulk athlete deletion: mixed CASCADE/SET NULL
+        # paths otherwise depend on PostgreSQL's per-row deletion order.
+        db.execute('DELETE FROM gyms')
         db.execute('DELETE FROM athletes')
         db.execute('DELETE FROM attempts')
     with TestClient(main.app) as test:

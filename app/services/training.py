@@ -506,6 +506,9 @@ def delete_account(payload: DeleteAccount, request: Request, response: Response)
         encoded = db.execute("SELECT password FROM athletes WHERE id=?", (athlete["id"],)).fetchone()[0]
         if not password_matches(payload.password, encoded):
             raise HTTPException(401, "Password did not match.")
+        # Remove owned gym trees before nulling this athlete in surviving audit
+        # records/plans. Do not depend on mixed foreign-key trigger ordering.
+        db.execute("DELETE FROM gyms WHERE owner=?", (athlete["id"],))
         db.execute("DELETE FROM athletes WHERE id=?", (athlete["id"],))
     response.delete_cookie(COOKIE, path="/", httponly=True, samesite="strict", secure=get_settings().environment == "production")
     return {"deleted": True}
